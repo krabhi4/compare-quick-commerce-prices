@@ -65,7 +65,7 @@ class FlipkartScraper(BaseScraper):
                         in_stock=in_stock,
                         product_url=product_url,
                         image_url=image_url,
-                        eta="10-20 mins",
+                        eta="10-15 mins",
                     )
                 )
 
@@ -80,7 +80,7 @@ class FlipkartScraper(BaseScraper):
             "Accept": "application/json",
         }
         body = {
-            "pageUri": f"/search?q={query}",
+            "pageUri": f"/search?q={query}&marketplace=HYPERLOCAL&as-show=on&as=off",
             "locationContext": {"pincode": pin},
         }
 
@@ -101,9 +101,17 @@ class FlipkartScraper(BaseScraper):
 
         return []
 
-    async def _search_via_browser(self, query: str, pin: str) -> list[PlatformProduct]:
+    async def _search_via_browser(self, query: str, pin: str, lat: float | None = None, lon: float | None = None) -> list[PlatformProduct]:
         async with self.lock:
             context = await self.get_context()
+            lat_val = lat or 28.6139
+            lon_val = lon or 77.2090
+            
+            await context.add_cookies([
+                {"name": "pincode", "value": pin or "110001", "domain": ".flipkart.com", "path": "/"},
+                {"name": "sn", "value": pin or "110001", "domain": ".flipkart.com", "path": "/"},
+            ])
+
             page = await context.new_page()
             products: list[PlatformProduct] = []
 
@@ -115,11 +123,8 @@ class FlipkartScraper(BaseScraper):
                     else route.continue_(),
                 )
 
-                await page.goto(
-                    f"https://www.flipkart.com/search?q={query}",
-                    wait_until="domcontentloaded",
-                    timeout=20000,
-                )
+                minutes_url = f"https://www.flipkart.com/search?q={query}&otracker=search&otracker1=search&marketplace=HYPERLOCAL&as-show=on&as=off"
+                await page.goto(minutes_url, wait_until="domcontentloaded", timeout=20000)
                 await page.wait_for_timeout(4000)
 
                 price_elems = await page.query_selector_all(".hZ3P6w, .Nx9bqj, ._30jeq3, ._25b18c")
@@ -189,7 +194,7 @@ class FlipkartScraper(BaseScraper):
                             in_stock=True,
                             product_url=product_url,
                             image_url=img_url,
-                            eta="15-20 mins",
+                            eta="10-15 mins",
                         )
                     )
             except Exception as exc:
@@ -205,4 +210,4 @@ class FlipkartScraper(BaseScraper):
         products = await self._search_via_api(query, pin)
         if products:
             return products
-        return await self._search_via_browser(query, pin)
+        return await self._search_via_browser(query, pin, lat, lon)
