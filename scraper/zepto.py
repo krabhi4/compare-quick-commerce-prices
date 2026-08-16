@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import re
 from api.models import PlatformProduct
 from scraper.base import BaseScraper
 
@@ -13,7 +15,7 @@ class ZeptoScraper(BaseScraper):
     def _parse_product_variant(self, variant_data: dict) -> PlatformProduct | None:
         try:
             product_info = variant_data.get("product") or variant_data
-            name = product_info.get("name") or variant_data.get("name")
+            name = product_info.get("name") or variant_data.get("name") or product_info.get("title")
             if not name:
                 return None
 
@@ -22,7 +24,7 @@ class ZeptoScraper(BaseScraper):
             mrp = price_info.get("mrp") or price_info.get("originalPrice")
 
             if sp is None:
-                sp = variant_data.get("discountedSellingPrice") or variant_data.get("sellingPrice")
+                sp = variant_data.get("discountedSellingPrice") or variant_data.get("sellingPrice") or variant_data.get("mrp")
                 mrp = variant_data.get("mrp")
 
             if sp is None:
@@ -38,6 +40,7 @@ class ZeptoScraper(BaseScraper):
                 or variant_data.get("packsize")
                 or product_info.get("formattedPacksize")
                 or product_info.get("packsize")
+                or variant_data.get("weightInGms")
             )
 
             images = product_info.get("images") or variant_data.get("images") or []
@@ -55,10 +58,10 @@ class ZeptoScraper(BaseScraper):
 
             return PlatformProduct(
                 platform="zepto",
-                name=name,
+                name=str(name).strip(),
                 price=price,
                 mrp=mrp_val,
-                quantity=quantity,
+                quantity=str(quantity) if quantity else None,
                 in_stock=not out_of_stock,
                 product_url=product_url,
                 image_url=image_url,
@@ -75,14 +78,20 @@ class ZeptoScraper(BaseScraper):
         for widget in layout:
             data = widget.get("data", {})
             resolver = data.get("resolver", {})
-            items = resolver.get("items") or resolver.get("products") or []
+            items = resolver.get("items") or resolver.get("products") or resolver.get("data", {}).get("items") or []
             for item in items:
                 product_obj = self._parse_product_variant(item)
                 if product_obj:
                     products.append(product_obj)
 
         if not products:
-            items = payload.get("items") or payload.get("products") or payload.get("data", {}).get("items") or []
+            items = (
+                payload.get("items")
+                or payload.get("products")
+                or payload.get("data", {}).get("items")
+                or payload.get("data", {}).get("products")
+                or []
+            )
             for item in items:
                 product_obj = self._parse_product_variant(item)
                 if product_obj:
@@ -95,13 +104,20 @@ class ZeptoScraper(BaseScraper):
     ) -> list[PlatformProduct]:
         async with self.lock:
             context = await self.get_context()
+            lat_val = str(lat or 28.46)
+            lon_val = str(lon or 77.06)
+            await context.add_cookies([
+                {"name": "userLocation", "value": f'{{"latitude":{lat_val},"longitude":{lon_val},"city":"Delhi","pincode":"{pin or "110001"}"}}', "domain": ".zeptonow.com", "path": "/"},
+                {"name": "isLocationSet", "value": "true", "domain": ".zeptonow.com", "path": "/"},
+            ])
+
             page = await context.new_page()
             products: list[PlatformProduct] = []
             captured_payloads: list[dict] = []
 
             async def handle_response(response):
                 try:
-                    if "/search" in response.url and response.status == 200:
+                    if ("/search" in response.url or "/inventory" in response.url) and response.status == 200:
                         content_type = response.headers.get("content-type", "")
                         if "application/json" in content_type:
                             data = await response.json()
@@ -124,7 +140,7 @@ class ZeptoScraper(BaseScraper):
                     wait_until="domcontentloaded",
                     timeout=20000,
                 )
-                await page.wait_for_timeout(3500)
+                await page.wait_for_timeout(4000)
 
                 for payload in captured_payloads:
                     extracted = self._parse_search_json(payload)
@@ -133,29 +149,27 @@ class ZeptoScraper(BaseScraper):
                         break
 
                 if not products:
-                    cards = await page.query_selector_all("[data-testid='product-card']")
+                    cards = await page.query_selector_all("[data-testid='product-card'], a[href*='/pn/']")
                     for card in cards:
-                        name_elem = await card.query_selector("[data-testid='product-card-name']")
-                        price_elem = await card.query_selector("[data-testid='product-card-price']")
+                        name_elem = await card.query_selector("[data-testid='product-card-name'], h5, span")
+                        price_elem = await card.query_selector("[data-testid='product-card-price'], h4, p")
                         qty_elem = await card.query_selector("[data-testid='product-card-quantity']")
                         if name_elem and price_elem:
                             name_text = await name_elem.inner_text()
                             price_text = await price_elem.inner_text()
                             qty_text = await qty_elem.inner_text() if qty_elem else None
-                            try:
-                                clean_price = float(price_text.replace("₹", "").replace(",", "").strip())
+                            match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
+                            if match and len(name_text.strip()) > 2:
                                 products.append(
                                     PlatformProduct(
                                         platform="zepto",
                                         name=name_text.strip(),
-                                        price=clean_price,
+                                        price=float(match.group(1)),
                                         quantity=qty_text.strip() if qty_text else None,
                                         in_stock=True,
                                         eta="10 mins",
                                     )
                                 )
-                            except ValueError:
-                                continue
             except Exception as exc:
                 logger.error(f"Zepto scraping error: {exc}")
             finally:

@@ -1,12 +1,21 @@
 import asyncio
 import json
 import logging
+import re
 import httpx
 import cloudscraper
 from api.models import PlatformProduct
 from scraper.base import BaseScraper
 
 logger = logging.getLogger(__name__)
+
+
+def _get_text_val(val) -> str | None:
+    if val is None:
+        return None
+    if isinstance(val, dict):
+        return val.get("text") or val.get("title") or val.get("value")
+    return str(val)
 
 
 class BlinkitScraper(BaseScraper):
@@ -18,41 +27,45 @@ class BlinkitScraper(BaseScraper):
         products: list[PlatformProduct] = []
         for snippet in snippets:
             data = snippet.get("data", {})
-            name = data.get("name") or data.get("display_name")
-            if not name:
+            name_raw = _get_text_val(data.get("name") or data.get("display_name") or data.get("title"))
+            if not name_raw:
                 continue
 
-            price_raw = data.get("normal_price") or data.get("price") or data.get("offer_price")
-            mrp_raw = data.get("mrp") or data.get("market_price")
-            if price_raw is None:
+            price_val = _get_text_val(data.get("normal_price") or data.get("offer_price") or data.get("price") or data.get("sale_price"))
+            mrp_val = _get_text_val(data.get("mrp") or data.get("market_price"))
+            if not price_val:
                 continue
 
-            try:
-                price = float(str(price_raw).replace("₹", "").replace(",", "").strip())
-            except ValueError:
+            price_match = re.search(r"(\d+(?:\.\d+)?)", str(price_val).replace(",", ""))
+            if not price_match:
                 continue
+            price = float(price_match.group(1))
 
             mrp = None
-            if mrp_raw is not None:
-                try:
-                    mrp = float(str(mrp_raw).replace("₹", "").replace(",", "").strip())
-                except ValueError:
-                    mrp = None
+            if mrp_val:
+                mrp_match = re.search(r"(\d+(?:\.\d+)?)", str(mrp_val).replace(",", ""))
+                if mrp_match:
+                    mrp = float(mrp_match.group(1))
 
-            quantity = data.get("unit") or data.get("pack_size") or data.get("quantity")
-            image_url = data.get("image_url") or data.get("image") or data.get("icon")
-            product_url = None
-            product_id = data.get("product_id") or data.get("id")
-            if product_id:
-                product_url = f"https://blinkit.com/prn/{product_id}"
+            quantity = _get_text_val(data.get("unit") or data.get("pack_size") or data.get("quantity"))
+            
+            image_url = None
+            img = data.get("image") or data.get("image_url") or data.get("icon")
+            if isinstance(img, dict):
+                image_url = img.get("url") or img.get("src")
+            elif isinstance(img, str):
+                image_url = img
+
+            product_id = data.get("product_id") or data.get("inventory_item_id") or data.get("id")
+            product_url = f"https://blinkit.com/prn/{product_id}" if product_id else None
 
             in_stock = data.get("inventory", 1) > 0 and not data.get("out_of_stock", False)
-            eta = data.get("eta") or "10-15 mins"
+            eta = _get_text_val(data.get("eta")) or "10-15 mins"
 
             products.append(
                 PlatformProduct(
                     platform="blinkit",
-                    name=name,
+                    name=name_raw.strip(),
                     price=price,
                     mrp=mrp,
                     quantity=quantity,
@@ -111,12 +124,22 @@ class BlinkitScraper(BaseScraper):
 
         return []
 
-    async def _search_via_browser(self, query: str) -> list[PlatformProduct]:
+    async def _search_via_browser(
+        self, query: str, pin: str, lat: float | None = None, lon: float | None = None
+    ) -> list[PlatformProduct]:
         async with self.lock:
             context = await self.get_context()
+            lat_val = str(lat or 28.6139)
+            lon_val = str(lon or 77.2090)
+            await context.add_cookies([
+                {"name": "lat", "value": lat_val, "domain": ".blinkit.com", "path": "/"},
+                {"name": "lon", "value": lon_val, "domain": ".blinkit.com", "path": "/"},
+                {"name": "pincode", "value": pin or "110001", "domain": ".blinkit.com", "path": "/"},
+                {"name": "city", "value": "Delhi", "domain": ".blinkit.com", "path": "/"},
+            ])
+
             page = await context.new_page()
             products: list[PlatformProduct] = []
-
             captured_payloads: list[dict] = []
 
             async def handle_response(response):
@@ -143,7 +166,7 @@ class BlinkitScraper(BaseScraper):
                     wait_until="domcontentloaded",
                     timeout=20000,
                 )
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(4000)
 
                 for payload in captured_payloads:
                     snippets = (
@@ -155,10 +178,9 @@ class BlinkitScraper(BaseScraper):
                     extracted = self._extract_from_snippets(snippets)
                     if extracted:
                         products.extend(extracted)
-                        break
 
                 if not products:
-                    cards = await page.query_selector_all("[data-test-id='plp-product']")
+                    cards = await page.query_selector_all("[data-test-id='plp-product'], a[href*='/prn/']")
                     for card in cards:
                         name_elem = await card.query_selector("div[title], .Product__UpdatedTitle")
                         price_elem = await card.query_selector(".Product__UpdatedPrice")
@@ -166,7 +188,7 @@ class BlinkitScraper(BaseScraper):
                             name_text = await name_elem.inner_text()
                             price_text = await price_elem.inner_text()
                             try:
-                                clean_price = float(price_text.replace("₹", "").replace(",", "").strip())
+                                clean_price = float(re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", "")).group(1))
                                 products.append(
                                     PlatformProduct(
                                         platform="blinkit",
@@ -176,7 +198,7 @@ class BlinkitScraper(BaseScraper):
                                         eta="10-15 mins",
                                     )
                                 )
-                            except ValueError:
+                            except Exception:
                                 continue
             except Exception as exc:
                 logger.error(f"Blinkit browser scraping failed: {exc}")
@@ -192,4 +214,4 @@ class BlinkitScraper(BaseScraper):
         if products:
             return products
 
-        return await self._search_via_browser(query)
+        return await self._search_via_browser(query, pin, lat, lon)
