@@ -14,12 +14,8 @@ class FlipkartScraper(BaseScraper):
 
     def _extract_from_widget_data(self, response_data: dict) -> list[PlatformProduct]:
         products: list[PlatformProduct] = []
-        slots = (
-            response_data.get("RESPONSE", {}).get("slots")
-            or response_data.get("slots")
-            or response_data.get("data", {}).get("slots")
-            or []
-        )
+        resp = response_data.get("RESPONSE", {}) or response_data
+        slots = resp.get("slots", []) or response_data.get("slots", []) or []
 
         for slot in slots:
             widget = slot.get("widget", {})
@@ -87,7 +83,7 @@ class FlipkartScraper(BaseScraper):
         try:
             async with httpx.AsyncClient(timeout=6.0) as client:
                 response = await client.post(
-                    "https://1.rome.api.flipkart.com/api/4/page/fetch?cacheFirst=false",
+                    "https://www.flipkart.com/api/4/page/fetch?cacheFirst=false",
                     headers=headers,
                     json=body,
                 )
@@ -101,12 +97,16 @@ class FlipkartScraper(BaseScraper):
 
         return []
 
-    async def _search_via_browser(self, query: str, pin: str, lat: float | None = None, lon: float | None = None) -> list[PlatformProduct]:
+    async def _search_via_browser(
+        self, query: str, pin: str, lat: float | None = None, lon: float | None = None
+    ) -> list[PlatformProduct]:
         async with self.lock:
             context = await self.get_context()
             lat_val = lat or 28.6139
             lon_val = lon or 77.2090
-            
+
+            await context.set_geolocation({"latitude": lat_val, "longitude": lon_val})
+            await context.grant_permissions(["geolocation"])
             await context.add_cookies([
                 {"name": "pincode", "value": pin or "110001", "domain": ".flipkart.com", "path": "/"},
                 {"name": "sn", "value": pin or "110001", "domain": ".flipkart.com", "path": "/"},
@@ -114,6 +114,19 @@ class FlipkartScraper(BaseScraper):
 
             page = await context.new_page()
             products: list[PlatformProduct] = []
+            captured_payloads: list[dict] = []
+
+            async def handle_response(response):
+                try:
+                    if ("page/fetch" in response.url or "/search" in response.url) and response.status == 200:
+                        content_type = response.headers.get("content-type", "")
+                        if "application/json" in content_type:
+                            data = await response.json()
+                            captured_payloads.append(data)
+                except Exception:
+                    pass
+
+            page.on("response", handle_response)
 
             try:
                 await page.route(
@@ -123,80 +136,92 @@ class FlipkartScraper(BaseScraper):
                     else route.continue_(),
                 )
 
-                minutes_url = f"https://www.flipkart.com/search?q={query}&otracker=search&otracker1=search&marketplace=HYPERLOCAL&as-show=on&as=off"
+                minutes_url = f"https://www.flipkart.com/search?q={query}&marketplace=HYPERLOCAL&as-show=on&as=off"
                 await page.goto(minutes_url, wait_until="domcontentloaded", timeout=20000)
-                await page.wait_for_timeout(4000)
+                await page.wait_for_timeout(3000)
 
-                price_elems = await page.query_selector_all(".hZ3P6w, .Nx9bqj, ._30jeq3, ._25b18c")
-                seen_names = set()
+                if "preview-page" in page.url:
+                    loc_btn = await page.query_selector("text='Use my current location'")
+                    if loc_btn:
+                        await loc_btn.click()
+                        await page.wait_for_timeout(3000)
 
-                for p_elem in price_elems:
-                    card_handle = await page.evaluate_handle(
-                        """elem => {
-                            let curr = elem;
-                            while (curr && curr.parentElement && !curr.getAttribute('data-id') && curr.tagName !== 'BODY') {
-                                if (curr.classList.contains('_1sdMkc') || curr.classList.contains('cPHDOP') || curr.classList.contains('_75nlfW') || curr.classList.contains('slAVV4') || curr.classList.contains('_4ddWXP')) {
-                                    return curr;
+                for payload in captured_payloads:
+                    extracted = self._extract_from_widget_data(payload)
+                    if extracted:
+                        products.extend(extracted)
+
+                if not products:
+                    price_elems = await page.query_selector_all(".hZ3P6w, .Nx9bqj, ._30jeq3, ._25b18c")
+                    seen_names = set()
+
+                    for p_elem in price_elems:
+                        card_handle = await page.evaluate_handle(
+                            """elem => {
+                                let curr = elem;
+                                while (curr && curr.parentElement && !curr.getAttribute('data-id') && curr.tagName !== 'BODY') {
+                                    if (curr.classList.contains('_1sdMkc') || curr.classList.contains('cPHDOP') || curr.classList.contains('_75nlfW') || curr.classList.contains('slAVV4') || curr.classList.contains('_4ddWXP')) {
+                                        return curr;
+                                    }
+                                    curr = curr.parentElement;
                                 }
-                                curr = curr.parentElement;
-                            }
-                            return curr || elem.parentElement;
-                        }""",
-                        p_elem,
-                    )
-                    card = card_handle.as_element()
-                    if not card:
-                        continue
-
-                    raw_text = await card.inner_text()
-                    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-                    if not lines:
-                        continue
-
-                    title_candidates = [l for l in lines if "₹" not in l and "%" not in l and not re.match(r"^\d(\.\d)?\(\d+\)$", l) and "free delivery" not in l.lower() and "bank offer" not in l.lower() and "sponsored" not in l.lower()]
-                    if not title_candidates:
-                        continue
-
-                    title = title_candidates[0]
-                    if title in seen_names or len(title) < 3:
-                        continue
-                    seen_names.add(title)
-
-                    price_text = await p_elem.inner_text()
-                    price_match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
-                    if not price_match:
-                        continue
-                    price = float(price_match.group(1))
-
-                    mrp = None
-                    mrp_elem = await card.query_selector(".kRYCnD, .yRaY8j, ._3I9_wc")
-                    if mrp_elem:
-                        mrp_text = await mrp_elem.inner_text()
-                        mrp_match = re.search(r"(\d+(?:\.\d+)?)", mrp_text.replace(",", ""))
-                        if mrp_match:
-                            mrp = float(mrp_match.group(1))
-
-                    link_elem = await card.query_selector("a")
-                    img_elem = await card.query_selector("img")
-
-                    href = await link_elem.get_attribute("href") if link_elem else None
-                    img_url = await img_elem.get_attribute("src") if img_elem else None
-
-                    product_url = f"https://www.flipkart.com{href}" if href and href.startswith("/") else href
-
-                    products.append(
-                        PlatformProduct(
-                            platform="flipkart",
-                            name=title,
-                            price=price,
-                            mrp=mrp,
-                            quantity=None,
-                            in_stock=True,
-                            product_url=product_url,
-                            image_url=img_url,
-                            eta="10-15 mins",
+                                return curr || elem.parentElement;
+                            }""",
+                            p_elem,
                         )
-                    )
+                        card = card_handle.as_element()
+                        if not card:
+                            continue
+
+                        raw_text = await card.inner_text()
+                        lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+                        if not lines:
+                            continue
+
+                        title_candidates = [l for l in lines if "₹" not in l and "%" not in l and not re.match(r"^\d(\.\d)?\(\d+\)$", l) and "free delivery" not in l.lower() and "bank offer" not in l.lower() and "sponsored" not in l.lower()]
+                        if not title_candidates:
+                            continue
+
+                        title = title_candidates[0]
+                        if title in seen_names or len(title) < 3:
+                            continue
+                        seen_names.add(title)
+
+                        price_text = await p_elem.inner_text()
+                        price_match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
+                        if not price_match:
+                            continue
+                        price = float(price_match.group(1))
+
+                        mrp = None
+                        mrp_elem = await card.query_selector(".kRYCnD, .yRaY8j, ._3I9_wc")
+                        if mrp_elem:
+                            mrp_text = await mrp_elem.inner_text()
+                            mrp_match = re.search(r"(\d+(?:\.\d+)?)", mrp_text.replace(",", ""))
+                            if mrp_match:
+                                mrp = float(mrp_match.group(1))
+
+                        link_elem = await card.query_selector("a")
+                        img_elem = await card.query_selector("img")
+
+                        href = await link_elem.get_attribute("href") if link_elem else None
+                        img_url = await img_elem.get_attribute("src") if img_elem else None
+
+                        product_url = f"https://www.flipkart.com{href}" if href and href.startswith("/") else href
+
+                        products.append(
+                            PlatformProduct(
+                                platform="flipkart",
+                                name=title,
+                                price=price,
+                                mrp=mrp,
+                                quantity=None,
+                                in_stock=True,
+                                product_url=product_url,
+                                image_url=img_url,
+                                eta="10-15 mins",
+                            )
+                        )
             except Exception as exc:
                 logger.error(f"Flipkart browser search failed: {exc}")
             finally:
