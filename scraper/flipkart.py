@@ -67,37 +67,109 @@ class FlipkartScraper(BaseScraper):
 
         return products
 
-    async def _search_via_api(self, query: str, pin: str) -> list[PlatformProduct]:
-        headers = {
-            "flipkart_secure": "true",
-            "x-user-agent": "FKUA/website/41/website/Desktop",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        body = {
-            "pageUri": f"/search?q={query}&marketplace=HYPERLOCAL&as-show=on&as=off",
-            "locationContext": {"pincode": pin},
-        }
+    async def _search_page(self, page, url: str) -> list[PlatformProduct]:
+        products: list[PlatformProduct] = []
+        captured_payloads: list[dict] = []
+
+        async def handle_response(response):
+            try:
+                if ("page/fetch" in response.url or "/search" in response.url) and response.status == 200:
+                    content_type = response.headers.get("content-type", "")
+                    if "application/json" in content_type:
+                        data = await response.json()
+                        if isinstance(data, dict):
+                            captured_payloads.append(data)
+            except Exception:
+                pass
+
+        page.on("response", handle_response)
 
         try:
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                response = await client.post(
-                    "https://www.flipkart.com/api/4/page/fetch?cacheFirst=false",
-                    headers=headers,
-                    json=body,
-                )
-                if response.status_code == 200:
-                    json_data = response.json()
-                    products = self._extract_from_widget_data(json_data)
-                    if products:
-                        return products
+            await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            await page.wait_for_timeout(3500)
+
+            for payload in captured_payloads:
+                extracted = self._extract_from_widget_data(payload)
+                if extracted:
+                    products.extend(extracted)
+
+            if not products:
+                price_elems = await page.query_selector_all(".hZ3P6w, .Nx9bqj, ._30jeq3, ._25b18c")
+                seen_names = set()
+
+                for p_elem in price_elems:
+                    card_handle = await page.evaluate_handle(
+                        """elem => {
+                            let curr = elem;
+                            while (curr && curr.parentElement && !curr.getAttribute('data-id') && curr.tagName !== 'BODY') {
+                                if (curr.classList.contains('_1sdMkc') || curr.classList.contains('cPHDOP') || curr.classList.contains('_75nlfW') || curr.classList.contains('slAVV4') || curr.classList.contains('_4ddWXP')) {
+                                    return curr;
+                                }
+                                curr = curr.parentElement;
+                            }
+                            return curr || elem.parentElement;
+                        }""",
+                        p_elem,
+                    )
+                    card = card_handle.as_element()
+                    if not card:
+                        continue
+
+                    raw_text = await card.inner_text()
+                    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+                    if not lines:
+                        continue
+
+                    title_candidates = [l for l in lines if "₹" not in l and "%" not in l and not re.match(r"^\d(\.\d)?\(\d+\)$", l) and "free delivery" not in l.lower() and "bank offer" not in l.lower() and "sponsored" not in l.lower()]
+                    if not title_candidates:
+                        continue
+
+                    title = title_candidates[0]
+                    if title in seen_names or len(title) < 3:
+                        continue
+                    seen_names.add(title)
+
+                    price_text = await p_elem.inner_text()
+                    price_match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
+                    if not price_match:
+                        continue
+                    price = float(price_match.group(1))
+
+                    mrp = None
+                    mrp_elem = await card.query_selector(".kRYCnD, .yRaY8j, ._3I9_wc")
+                    if mrp_elem:
+                        mrp_text = await mrp_elem.inner_text()
+                        mrp_match = re.search(r"(\d+(?:\.\d+)?)", mrp_text.replace(",", ""))
+                        if mrp_match:
+                            mrp = float(mrp_match.group(1))
+
+                    link_elem = await card.query_selector("a")
+                    img_elem = await card.query_selector("img")
+
+                    href = await link_elem.get_attribute("href") if link_elem else None
+                    img_url = await img_elem.get_attribute("src") if img_elem else None
+
+                    product_url = f"https://www.flipkart.com{href}" if href and href.startswith("/") else href
+
+                    products.append(
+                        PlatformProduct(
+                            platform="flipkart",
+                            name=title,
+                            price=price,
+                            mrp=mrp,
+                            quantity=None,
+                            in_stock=True,
+                            product_url=product_url,
+                            image_url=img_url,
+                            eta="10-15 mins",
+                        )
+                    )
         except Exception as exc:
-            logger.warning(f"Flipkart direct API failed: {exc}")
+            logger.error(f"Flipkart page search error: {exc}")
 
-        return []
+        return products
 
-    async def _search_via_browser(
+    async def search(
         self, query: str, pin: str, lat: float | None = None, lon: float | None = None
     ) -> list[PlatformProduct]:
         async with self.lock:
@@ -113,21 +185,6 @@ class FlipkartScraper(BaseScraper):
             ])
 
             page = await context.new_page()
-            products: list[PlatformProduct] = []
-            captured_payloads: list[dict] = []
-
-            async def handle_response(response):
-                try:
-                    if ("page/fetch" in response.url or "/search" in response.url) and response.status == 200:
-                        content_type = response.headers.get("content-type", "")
-                        if "application/json" in content_type:
-                            data = await response.json()
-                            captured_payloads.append(data)
-                except Exception:
-                    pass
-
-            page.on("response", handle_response)
-
             try:
                 await page.route(
                     "**/*",
@@ -137,102 +194,12 @@ class FlipkartScraper(BaseScraper):
                 )
 
                 minutes_url = f"https://www.flipkart.com/search?q={query}&marketplace=HYPERLOCAL&as-show=on&as=off"
-                await page.goto(minutes_url, wait_until="domcontentloaded", timeout=20000)
-                await page.wait_for_timeout(3000)
-
-                if "preview-page" in page.url:
-                    loc_btn = await page.query_selector("text='Use my current location'")
-                    if loc_btn:
-                        await loc_btn.click()
-                        await page.wait_for_timeout(3000)
-
-                for payload in captured_payloads:
-                    extracted = self._extract_from_widget_data(payload)
-                    if extracted:
-                        products.extend(extracted)
+                products = await self._search_page(page, minutes_url)
 
                 if not products:
-                    price_elems = await page.query_selector_all(".hZ3P6w, .Nx9bqj, ._30jeq3, ._25b18c")
-                    seen_names = set()
+                    fallback_url = f"https://www.flipkart.com/search?q={query}"
+                    products = await self._search_page(page, fallback_url)
 
-                    for p_elem in price_elems:
-                        card_handle = await page.evaluate_handle(
-                            """elem => {
-                                let curr = elem;
-                                while (curr && curr.parentElement && !curr.getAttribute('data-id') && curr.tagName !== 'BODY') {
-                                    if (curr.classList.contains('_1sdMkc') || curr.classList.contains('cPHDOP') || curr.classList.contains('_75nlfW') || curr.classList.contains('slAVV4') || curr.classList.contains('_4ddWXP')) {
-                                        return curr;
-                                    }
-                                    curr = curr.parentElement;
-                                }
-                                return curr || elem.parentElement;
-                            }""",
-                            p_elem,
-                        )
-                        card = card_handle.as_element()
-                        if not card:
-                            continue
-
-                        raw_text = await card.inner_text()
-                        lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-                        if not lines:
-                            continue
-
-                        title_candidates = [l for l in lines if "₹" not in l and "%" not in l and not re.match(r"^\d(\.\d)?\(\d+\)$", l) and "free delivery" not in l.lower() and "bank offer" not in l.lower() and "sponsored" not in l.lower()]
-                        if not title_candidates:
-                            continue
-
-                        title = title_candidates[0]
-                        if title in seen_names or len(title) < 3:
-                            continue
-                        seen_names.add(title)
-
-                        price_text = await p_elem.inner_text()
-                        price_match = re.search(r"(\d+(?:\.\d+)?)", price_text.replace(",", ""))
-                        if not price_match:
-                            continue
-                        price = float(price_match.group(1))
-
-                        mrp = None
-                        mrp_elem = await card.query_selector(".kRYCnD, .yRaY8j, ._3I9_wc")
-                        if mrp_elem:
-                            mrp_text = await mrp_elem.inner_text()
-                            mrp_match = re.search(r"(\d+(?:\.\d+)?)", mrp_text.replace(",", ""))
-                            if mrp_match:
-                                mrp = float(mrp_match.group(1))
-
-                        link_elem = await card.query_selector("a")
-                        img_elem = await card.query_selector("img")
-
-                        href = await link_elem.get_attribute("href") if link_elem else None
-                        img_url = await img_elem.get_attribute("src") if img_elem else None
-
-                        product_url = f"https://www.flipkart.com{href}" if href and href.startswith("/") else href
-
-                        products.append(
-                            PlatformProduct(
-                                platform="flipkart",
-                                name=title,
-                                price=price,
-                                mrp=mrp,
-                                quantity=None,
-                                in_stock=True,
-                                product_url=product_url,
-                                image_url=img_url,
-                                eta="10-15 mins",
-                            )
-                        )
-            except Exception as exc:
-                logger.error(f"Flipkart browser search failed: {exc}")
+                return products
             finally:
                 await page.close()
-
-            return products
-
-    async def search(
-        self, query: str, pin: str, lat: float | None = None, lon: float | None = None
-    ) -> list[PlatformProduct]:
-        products = await self._search_via_api(query, pin)
-        if products:
-            return products
-        return await self._search_via_browser(query, pin, lat, lon)
