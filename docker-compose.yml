@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DEFAULT_PIN=110001
+      - DEFAULT_LAT=28.46
+      - DEFAULT_LON=77.06
+      - ALERT_CHECK_INTERVAL_SECONDS=900
+    restart: unless-stopped
