@@ -17,17 +17,17 @@ export const LoginPanel: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-100">
-              Platform Accounts & Interactive Login
+              Platform Sessions & Account Status
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
-              Login to your quick-commerce accounts to view personalized pricing, VIP delivery slots, and member-only discounts. Your credentials never leave your browser session.
+              Quick-commerce price comparison works out of the box in guest mode without needing any login. Connecting an account is optional and enables personalized location rates and store cookies.
             </p>
           </div>
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-2 text-xs text-slate-400">
           <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <span>Local session cookies stored securely in Docker volume data.</span>
+          <span>Local session cookies and persistent profiles are stored securely in your Docker volume.</span>
         </div>
       </div>
 
@@ -57,11 +57,11 @@ export const LoginPanel: React.FC = () => {
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                         <span className="text-xs text-emerald-400 font-semibold">
-                          {account === 'Active Session' ? 'Logged In' : account}
+                          {account}
                         </span>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-500">Not connected</span>
+                      <span className="text-xs text-slate-500">Public Guest Mode</span>
                     )}
                   </div>
                 </div>
@@ -85,7 +85,7 @@ export const LoginPanel: React.FC = () => {
                     type="button"
                     disabled={loading || isLoggingIn}
                     onClick={() => login(plat)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold text-xs transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-medium text-xs transition-colors"
                   >
                     {isLoggingIn ? (
                       <>
