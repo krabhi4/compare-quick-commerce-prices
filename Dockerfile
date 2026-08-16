@@ -6,7 +6,7 @@ RUN pnpm install --frozen-lockfile || pnpm install
 COPY frontend/ .
 RUN pnpm run build
 
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     libglib2.0-0 \
