@@ -67,6 +67,52 @@ async def run_single_scraper(
         return []
 
 
+PIN_COORDS: dict[str, tuple[float, float]] = {
+    "11": (28.6139, 77.2090),
+    "12": (28.46, 77.06),
+    "14": (31.0, 75.0),
+    "30": (27.0, 74.0),
+    "40": (19.0760, 72.8777),
+    "50": (17.3850, 78.4867),
+    "56": (12.9716, 77.5946),
+    "60": (13.0827, 80.2707),
+    "70": (22.5726, 88.3639),
+    "80": (25.6162, 85.0926),
+    "82": (25.6162, 85.0926),
+    "83": (23.3441, 85.3096),
+    "84": (25.5941, 85.1376),
+}
+
+
+def _coords_for_pin(pin: str) -> tuple[float, float] | None:
+    if not pin or len(pin) < 2:
+        return None
+    return PIN_COORDS.get(pin[:2])
+
+
+def _resolve_lat_lon(pin: str, lat: float | None, lon: float | None) -> tuple[float, float]:
+    inferred = _coords_for_pin(pin)
+    if inferred:
+        if lat is None or lon is None:
+            return inferred
+        lat_diff = abs(lat - inferred[0])
+        lon_diff = abs(lon - inferred[1])
+        if lat_diff > 2 or lon_diff > 2:
+            return inferred
+    return (lat or settings.default_lat, lon or settings.default_lon)
+
+
+def _is_platform_enabled(platform: str) -> bool:
+    mapping = {
+        "blinkit": settings.enable_blinkit,
+        "zepto": settings.enable_zepto,
+        "instamart": settings.enable_instamart,
+        "flipkart": settings.enable_flipkart,
+        "bigbasket": settings.enable_bigbasket,
+    }
+    return mapping.get(platform, True)
+
+
 async def execute_concurrent_search(
     query: str,
     pin: str,
@@ -75,7 +121,7 @@ async def execute_concurrent_search(
     platforms: list[str] | None = None,
 ) -> SearchResponse:
     normalized_query = query.strip().lower()
-    cache_key = f"{normalized_query}:{pin}:{sorted(platforms) if platforms else 'all'}"
+    cache_key = f"{normalized_query}:{pin}:{lat}:{lon}:{sorted(platforms) if platforms else 'all'}"
 
     now = time.time()
     if cache_key in SEARCH_CACHE:
@@ -90,7 +136,7 @@ async def execute_concurrent_search(
             )
 
     selected_platforms = (
-        [p for p in platforms if p in SCRAPERS] if platforms else list(SCRAPERS.keys())
+        [p for p in platforms if p in SCRAPERS and _is_platform_enabled(p)] if platforms else [p for p in SCRAPERS.keys() if _is_platform_enabled(p)]
     )
 
     tasks = [
@@ -139,8 +185,7 @@ async def execute_concurrent_search(
 
 @router.post("/search", response_model=SearchResponse)
 async def search_products(request: SearchRequest) -> SearchResponse:
-    lat = request.lat or settings.default_lat
-    lon = request.lon or settings.default_lon
+    lat, lon = _resolve_lat_lon(request.pin, request.lat, request.lon)
     return await execute_concurrent_search(
         query=request.query,
         pin=request.pin,

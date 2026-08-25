@@ -37,7 +37,7 @@ export function useSearch() {
   const [lastQuery, setLastQuery] = useState<string>('')
 
   const executeSearch = useCallback(
-    async (query: string, pin: string, platforms?: string[]) => {
+    async (query: string, pin: string, platforms?: string[], lat?: number, lon?: number) => {
       if (!query.trim()) return
 
       setLoading(true)
@@ -53,6 +53,8 @@ export function useSearch() {
           body: JSON.stringify({
             query: query.trim(),
             pin: pin.trim(),
+            lat: lat,
+            lon: lon,
             platforms: platforms && platforms.length > 0 ? platforms : undefined,
           }),
         })

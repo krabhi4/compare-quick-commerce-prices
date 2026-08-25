@@ -1,6 +1,9 @@
 import asyncio
 import logging
+import re
+import urllib.parse
 import httpx
+import cloudscraper
 from api.config import settings
 from api.models import PlatformProduct
 from scraper.base import BaseScraper
@@ -11,6 +14,7 @@ logger = logging.getLogger(__name__)
 class BigBasketScraper(BaseScraper):
     def __init__(self):
         super().__init__("bigbasket")
+        self.scraper = cloudscraper.create_scraper()
 
     def _parse_product_item(self, item: dict) -> PlatformProduct | None:
         try:
@@ -61,34 +65,50 @@ class BigBasketScraper(BaseScraper):
             logger.warning(f"Error parsing BigBasket product: {exc}")
             return None
 
-    async def _search_via_api(self, query: str) -> list[PlatformProduct]:
+    async def _search_via_api(self, query: str, lat: float | None = None, lon: float | None = None) -> list[PlatformProduct]:
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
             "Accept": "application/json",
         }
+        slug = re.sub(r"\s+", "-", query.strip().lower())
+        slug = urllib.parse.quote(slug, safe="-")
+        lat_val = str(lat or 28.46)
+        lon_val = str(lon or 77.06)
+        url = f"https://www.bigbasket.com/listing-svc/v2/products?type=ps&slug={slug}&page=1&lat={lat_val}&lng={lon_val}"
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                url = f"https://www.bigbasket.com/listing-svc/v2/products?type=ps&slug={query}"
-                response = await client.get(url, headers=headers)
-                if response.status_code == 200:
-                    json_data = response.json()
-                    tabs = json_data.get("tabs", [])
-                    products: list[PlatformProduct] = []
-                    for tab in tabs:
-                        product_info = tab.get("product_info", {})
-                        items = product_info.get("products", [])
-                        for item in items:
-                            parsed = self._parse_product_item(item)
-                            if parsed:
-                                products.append(parsed)
-                    if products:
-                        return products
+            loop = asyncio.get_running_loop()
+
+            def fetch_with_cookies():
+                try:
+                    self.scraper.get(
+                        f"https://www.bigbasket.com/ps/?q={urllib.parse.quote(query)}",
+                        headers=headers,
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+                return self.scraper.get(url, headers=headers, timeout=10)
+
+            response = await loop.run_in_executor(None, fetch_with_cookies)
+            if response.status_code == 200:
+                json_data = response.json()
+                tabs = json_data.get("tabs", [])
+                products: list[PlatformProduct] = []
+                for tab in tabs:
+                    product_info = tab.get("product_info", {})
+                    items = product_info.get("products", [])
+                    for item in items:
+                        parsed = self._parse_product_item(item)
+                        if parsed:
+                            products.append(parsed)
+                if products:
+                    return products
         except Exception as exc:
             logger.warning(f"BigBasket API search failed: {exc}")
 
         return []
 
-    async def _search_via_browser(self, query: str) -> list[PlatformProduct]:
+    async def _search_via_browser(self, query: str, pin: str | None = None, lat: float | None = None, lon: float | None = None) -> list[PlatformProduct]:
         async with self.lock:
             context = await self.get_context()
             page = await context.new_page()
@@ -142,8 +162,8 @@ class BigBasketScraper(BaseScraper):
         if not settings.enable_bigbasket:
             return []
 
-        products = await self._search_via_api(query)
+        products = await self._search_via_api(query, lat, lon)
         if products:
             return products
 
-        return await self._search_via_browser(query)
+        return await self._search_via_browser(query, pin, lat, lon)

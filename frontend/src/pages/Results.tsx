@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react'
-import { ArrowUpDown, ShoppingBag, Sparkles, Filter } from 'lucide-react'
+import { ArrowUpDown, ShoppingBag, Sparkles, Filter, AlertCircle } from 'lucide-react'
 import type { GroupedProduct } from '../hooks/useSearch'
 import { ProductCard } from '../components/ProductCard'
 
 interface ResultsPageProps {
   results: GroupedProduct[]
   loading: boolean
+  error?: string | null
   isCached: boolean
   lastQuery: string
   onViewHistory: (normalizedName: string) => void
@@ -17,6 +18,7 @@ type SortOption = 'cheapest' | 'savings' | 'stores'
 export const ResultsPage: React.FC<ResultsPageProps> = ({
   results,
   loading,
+  error,
   isCached,
   lastQuery,
   onViewHistory,
@@ -65,9 +67,19 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
           <ShoppingBag className="w-5 h-5 text-emerald-400 absolute" />
         </div>
         <h3 className="text-base font-bold text-slate-200">
-          Comparing prices across Blinkit, Zepto, Instamart & more...
+          Comparing prices across Blinkit, Flipkart Minutes, Instamart & Zepto...
         </h3>
-        <p className="text-xs text-slate-500 mt-1">Scanning quick-commerce catalogs concurrently</p>
+        <p className="text-xs text-slate-500 mt-1">Scanning quick-commerce dark stores concurrently</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-rose-950/20 border border-rose-800/40 rounded-2xl p-8 flex flex-col items-center justify-center text-center max-w-xl mx-auto">
+        <AlertCircle className="w-10 h-10 text-rose-400 mb-2" />
+        <h3 className="text-base font-bold text-rose-200">Search Error</h3>
+        <p className="text-xs text-rose-400/80 mt-1">{error}</p>
       </div>
     )
   }

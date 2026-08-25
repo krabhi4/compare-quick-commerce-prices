@@ -171,7 +171,7 @@ def is_product_match(
     if similarity_score >= 75 and same_brand and same_quantity:
         return True
 
-    if similarity_score >= 70 and same_brand and same_quantity:
+    if similarity_score >= 70 and same_brand:
         return True
 
     return False

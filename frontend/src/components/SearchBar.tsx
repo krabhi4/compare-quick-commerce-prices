@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Search, MapPin, Loader2, X, Filter } from 'lucide-react'
 
 interface SearchBarProps {
@@ -38,21 +38,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   detectingLocation,
 }) => {
   const [query, setQuery] = useState('')
-  const [pin, setPin] = useState(currentPin)
+  const [pin, setPin] = useState(currentPin || '110001')
   const [showPinInput, setShowPinInput] = useState(false)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
 
+  useEffect(() => {
+    if (currentPin) {
+      setPin(currentPin)
+    }
+  }, [currentPin])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const activePin = pin.trim() || currentPin || '110001'
+    if (activePin !== currentPin && activePin.length === 6) {
+      onUpdatePin(activePin)
+    }
     if (query.trim() && !loading) {
-      onSearch(query.trim(), pin.trim() || currentPin, selectedPlatforms)
+      onSearch(query.trim(), activePin, selectedPlatforms)
     }
   }
 
   const handleSuggestionClick = (item: string) => {
     setQuery(item)
-    onSearch(item, pin.trim() || currentPin, selectedPlatforms)
+    const activePin = pin.trim() || currentPin || '110001'
+    onSearch(item, activePin, selectedPlatforms)
   }
 
   const togglePlatform = (id: string) => {
@@ -80,7 +91,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search groceries (e.g. Amul Milk, Eggs, Bread)..."
+            placeholder="Search groceries (e.g. Amul Milk, Croissant, Butter)..."
             className="w-full px-3 py-2.5 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-sm md:text-base font-medium"
             disabled={loading}
           />
@@ -103,7 +114,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               title="Change Delivery Pincode"
             >
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{currentPin}</span>
+              <span>{currentPin || pin || 'PIN'}</span>
             </button>
 
             <button
@@ -144,7 +155,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               maxLength={6}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="e.g. 110001"
+              placeholder="e.g. 800023"
               className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-emerald-500 w-28 text-center tracking-widest font-mono"
             />
             <button

@@ -177,9 +177,9 @@ class InstamartScraper(BaseScraper):
                 await page.goto(
                     f"https://www.swiggy.com/instamart/search?custom_back=true&query={query}",
                     wait_until="domcontentloaded",
-                    timeout=20000,
+                    timeout=25000,
                 )
-                await page.wait_for_timeout(4000)
+                await page.wait_for_timeout(6500)
 
                 for payload in captured_payloads:
                     extracted = self._parse_search_json(payload)

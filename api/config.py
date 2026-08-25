@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     alert_check_interval_seconds: int = 900
     cache_ttl_seconds: int = 300
-    scraper_timeout_seconds: int = 30
+    scraper_timeout_seconds: int = 45
 
     enable_blinkit: bool = True
     enable_zepto: bool = True

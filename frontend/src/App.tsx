@@ -26,6 +26,7 @@ export const App: React.FC = () => {
   const {
     results,
     loading: searchLoading,
+    error: searchError,
     isCached,
     lastQuery,
     executeSearch,
@@ -40,12 +41,12 @@ export const App: React.FC = () => {
 
   const handleSearch = (query: string, pin: string, platforms: string[]) => {
     setActiveTab('search')
-    executeSearch(query, pin, platforms)
+    executeSearch(query, pin, platforms, location.lat, location.lon)
   }
 
   const handleQuickSearch = (query: string) => {
     setActiveTab('search')
-    executeSearch(query, location.pin, [])
+    executeSearch(query, location.pin, [], location.lat, location.lon)
   }
 
   const handleOpenAlertWithPreset = (productName: string, currentPrice: number) => {
@@ -142,10 +143,11 @@ export const App: React.FC = () => {
               detectingLocation={detectingLocation}
             />
 
-            {results.length > 0 || searchLoading || lastQuery ? (
+            {results.length > 0 || searchLoading || lastQuery || searchError ? (
               <ResultsPage
                 results={results}
                 loading={searchLoading}
+                error={searchError}
                 isCached={isCached}
                 lastQuery={lastQuery}
                 onViewHistory={(name) => setHistoryModalProduct(name)}
