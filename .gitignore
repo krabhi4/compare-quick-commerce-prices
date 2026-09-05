@@ -10,3 +10,4 @@ data/
 *.db
 .env
 .DS_Store
+.playwright-mcp/

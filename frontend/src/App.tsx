@@ -35,6 +35,7 @@ export const App: React.FC = () => {
   const {
     location,
     detecting: detectingLocation,
+    error: locationError,
     updateLocation,
     detectLocation,
   } = useLocation()
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
               onUpdatePin={(pin) => updateLocation(pin)}
               onDetectLocation={detectLocation}
               detectingLocation={detectingLocation}
+              locationError={locationError}
             />
 
             {results.length > 0 || searchLoading || lastQuery || searchError ? (

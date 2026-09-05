@@ -8,6 +8,7 @@ interface SearchBarProps {
   onUpdatePin: (pin: string) => void
   onDetectLocation: () => void
   detectingLocation: boolean
+  locationError?: string | null
 }
 
 const QUICK_SUGGESTIONS = [
@@ -36,6 +37,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onUpdatePin,
   onDetectLocation,
   detectingLocation,
+  locationError,
 }) => {
   const [query, setQuery] = useState('')
   const [pin, setPin] = useState(currentPin || '110001')
@@ -52,7 +54,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const activePin = pin.trim() || currentPin || '110001'
-    if (activePin !== currentPin && activePin.length === 6) {
+    if (activePin.length !== 6) {
+      setShowPinInput(true)
+      return
+    }
+    if (activePin !== currentPin) {
       onUpdatePin(activePin)
     }
     if (query.trim() && !loading) {
@@ -178,6 +184,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               )}
               <span>Auto-Detect</span>
             </button>
+            {locationError && (
+              <span className="w-full text-xs text-rose-400">{locationError}</span>
+            )}
           </div>
         )}
 

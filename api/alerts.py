@@ -62,6 +62,7 @@ async def remove_price_alert(alert_id: int) -> dict[str, bool]:
 async def run_alerts_check_cycle() -> None:
     from api.search import execute_concurrent_search
 
+    await asyncio.sleep(settings.alert_check_interval_seconds)
     while True:
         try:
             alerts = await get_alerts(active_only=True)

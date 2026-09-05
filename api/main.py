@@ -3,7 +3,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,6 +12,7 @@ from api.models import HealthResponse, LocationUpdateRequest, LocationResponse
 from api.search import router as search_router, close_all_scrapers
 from api.auth import router as auth_router
 from api.alerts import router as alerts_router, run_alerts_check_cycle
+from api.geo import geocode_pin, reverse_geocode
 from db.repository import init_database
 
 logging.basicConfig(
@@ -80,30 +81,6 @@ def persist_location() -> None:
         logger.warning(f"Failed to persist location: {exc}")
 
 
-PIN_COORDS: dict[str, tuple[float, float]] = {
-    "11": (28.6139, 77.2090),
-    "12": (28.46, 77.06),
-    "14": (31.0, 75.0),
-    "30": (27.0, 74.0),
-    "40": (19.0760, 72.8777),
-    "50": (17.3850, 78.4867),
-    "56": (12.9716, 77.5946),
-    "60": (13.0827, 80.2707),
-    "70": (22.5726, 88.3639),
-    "80": (25.6162, 85.0926),
-    "82": (25.6162, 85.0926),
-    "83": (23.3441, 85.3096),
-    "84": (25.5941, 85.1376),
-}
-
-
-def coords_for_pin(pin: str) -> tuple[float, float] | None:
-    if not pin or len(pin) < 2:
-        return None
-    prefix = pin[:2]
-    return PIN_COORDS.get(prefix)
-
-
 @app.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", version=settings.app_version)
@@ -111,25 +88,22 @@ async def health_check() -> HealthResponse:
 
 @app.post("/location", response_model=LocationResponse)
 async def set_location(update: LocationUpdateRequest) -> LocationResponse:
-    current_location["pin"] = update.pin
-    if update.lat is not None:
-        current_location["lat"] = update.lat
+    if update.pin:
+        place = await geocode_pin(update.pin)
+        if not place:
+            raise HTTPException(status_code=400, detail=f"Could not locate pincode {update.pin}")
+        near = update.lat is not None and update.lon is not None and abs(update.lat - place["lat"]) < 0.5 and abs(update.lon - place["lon"]) < 0.5
+        current_location.update(pin=update.pin, lat=update.lat if near else place["lat"], lon=update.lon if near else place["lon"])
+    elif update.lat is not None and update.lon is not None:
+        place = await reverse_geocode(update.lat, update.lon)
+        pin = (place or {}).get("postcode", "")
+        if not (pin.isdigit() and len(pin) == 6):
+            raise HTTPException(status_code=400, detail="Could not resolve a pincode for this position")
+        current_location.update(pin=pin, lat=update.lat, lon=update.lon)
     else:
-        inferred = coords_for_pin(update.pin)
-        if inferred:
-            current_location["lat"], current_location["lon"] = inferred
-    if update.lon is not None:
-        current_location["lon"] = update.lon
-    elif update.lat is None:
-        inferred = coords_for_pin(update.pin)
-        if inferred:
-            current_location["lat"], current_location["lon"] = inferred
+        raise HTTPException(status_code=400, detail="Provide a pincode or coordinates")
     persist_location()
-    return LocationResponse(
-        pin=current_location["pin"],
-        lat=current_location["lat"],
-        lon=current_location["lon"],
-    )
+    return LocationResponse(**current_location)
 
 
 @app.get("/location", response_model=LocationResponse)

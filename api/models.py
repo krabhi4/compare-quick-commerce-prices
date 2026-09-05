@@ -90,7 +90,7 @@ class AlertResponse(BaseModel):
 
 
 class LocationUpdateRequest(BaseModel):
-    pin: str
+    pin: str | None = None
     lat: float | None = None
     lon: float | None = None
 

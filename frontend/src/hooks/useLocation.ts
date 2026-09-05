@@ -9,10 +9,11 @@ export interface LocationData {
 export function useLocation() {
   const [location, setLocation] = useState<LocationData>({
     pin: '110001',
-    lat: 28.46,
-    lon: 77.06,
+    lat: 28.6294,
+    lon: 77.2189,
   })
   const [detecting, setDetecting] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchLocation = useCallback(async () => {
     try {
@@ -29,21 +30,26 @@ export function useLocation() {
     }
   }, [])
 
-  const updateLocation = async (pin: string, lat?: number, lon?: number) => {
+  const updateLocation = async (pin?: string, lat?: number, lon?: number): Promise<string | null> => {
+    setError(null)
     try {
       const response = await fetch('/location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin, lat, lon }),
       })
-      if (response.ok) {
-        const data: LocationData = await response.json()
-        setLocation(data)
-        localStorage.setItem('qc_pincode', pin)
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        setError(body.detail || `Could not set location (${response.status})`)
+        return null
       }
+      const data: LocationData = await response.json()
+      setLocation(data)
+      localStorage.setItem('qc_pincode', data.pin)
+      return data.pin
     } catch {
-      setLocation((prev) => ({ ...prev, pin }))
-      localStorage.setItem('qc_pincode', pin)
+      setError('Could not reach the server to set location')
+      return null
     }
   }
 
@@ -53,12 +59,11 @@ export function useLocation() {
     setDetecting(true)
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude
-        const lon = pos.coords.longitude
-        await updateLocation(location.pin, lat, lon)
+        await updateLocation(undefined, pos.coords.latitude, pos.coords.longitude)
         setDetecting(false)
       },
       () => {
+        setError('Location permission denied')
         setDetecting(false)
       }
     )
@@ -71,6 +76,7 @@ export function useLocation() {
   return {
     location,
     detecting,
+    error,
     updateLocation,
     detectLocation,
   }

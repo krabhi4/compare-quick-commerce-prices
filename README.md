@@ -2,6 +2,12 @@
 
 Compare live grocery prices across Blinkit, Zepto, Swiggy Instamart, Flipkart Minutes & BigBasket Now.
 
+## How location works
+
+Every search is keyed on a 6-digit Indian pincode. The backend geocodes it with Nominatim (OpenStreetMap, free, cached in `data/geocache.json`) and passes the coordinates to each store, so results reflect the dark store that actually serves that pincode. "Auto-Detect" uses browser GPS and reverse-geocodes to a pincode.
+
+Blinkit, BigBasket and Flipkart Minutes are fetched via their public web APIs with no browser. Instamart and Zepto run inside a headless Chromium because their APIs sit behind browser challenges. A store that does not serve the pincode simply returns no products (for example Zepto does not operate in Patna).
+
 ## Requirements
 
 - Docker & Docker Compose
@@ -52,7 +58,7 @@ Vite dev server proxies `/search`, `/alerts`, `/history`, `/auth` to port 8000.
 
 - `POST /search`: Query product prices across stores
 - `GET /history?name=`: View historical price snapshots for a product
-- `POST /location`: Update delivery pincode and coordinates
+- `POST /location`: Set delivery pincode (`{"pin"}`) or GPS position (`{"lat","lon"}`), geocoded server-side
 - `GET /alerts`: List active price drop alerts
 - `POST /alerts`: Create new price drop alert
 - `DELETE /alerts/{id}`: Remove price alert
