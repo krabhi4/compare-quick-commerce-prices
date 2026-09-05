@@ -72,7 +72,6 @@ class ZeptoScraper(BaseScraper):
         return None
 
     async def _set_location(self, context, page, pin: str) -> bool:
-        before = await self._cookie(context, "user_position")
         await page.goto(HOME, wait_until="domcontentloaded", timeout=30000)
         await page.click('[data-testid="user-address"]', timeout=20000)
         box = page.locator('input[placeholder="Search a new address"]')
@@ -81,13 +80,11 @@ class ZeptoScraper(BaseScraper):
         first = page.locator('[data-testid="address-search-item"]').first
         await first.wait_for(timeout=15000)
         await first.click()
-        for _ in range(40):
+        await box.wait_for(state="hidden", timeout=20000)
+        for _ in range(20):
             await page.wait_for_timeout(500)
-            if await self._cookie(context, "user_position") != before:
+            if await self._cookie(context, "serviceability"):
                 break
-        else:
-            raise RuntimeError("location did not change after picking a suggestion")
-        await page.wait_for_timeout(1000)
         raw = await self._cookie(context, "serviceability")
         serviceability = json.loads(unquote(raw)) if raw else {}
         return bool((serviceability.get("primaryStore") or {}).get("serviceable"))

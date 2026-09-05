@@ -50,6 +50,7 @@ def parse_search(payload: dict) -> list[PlatformProduct]:
 class InstamartScraper(BaseScraper):
     def __init__(self):
         super().__init__("instamart")
+        self._located: tuple[float, float] | None = None
 
     async def search(
         self, query: str, pin: str, lat: float | None = None, lon: float | None = None
@@ -58,13 +59,15 @@ class InstamartScraper(BaseScraper):
             return []
         async with self.lock:
             context = await self.get_context()
-            loc = json.dumps({"address": "", "lat": lat, "lng": lon, "id": "", "annotation": "", "name": ""})
-            await context.clear_cookies()
-            await context.add_cookies([
-                {"name": "userLocation", "value": quote(loc), "domain": ".swiggy.com", "path": "/"},
-                {"name": "lat", "value": str(lat), "domain": ".swiggy.com", "path": "/"},
-                {"name": "lng", "value": str(lon), "domain": ".swiggy.com", "path": "/"},
-            ])
+            if self._located != (lat, lon):
+                loc = json.dumps({"address": "", "lat": lat, "lng": lon, "id": "", "annotation": "", "name": ""})
+                await context.clear_cookies()
+                await context.add_cookies([
+                    {"name": "userLocation", "value": quote(loc), "domain": ".swiggy.com", "path": "/"},
+                    {"name": "lat", "value": str(lat), "domain": ".swiggy.com", "path": "/"},
+                    {"name": "lng", "value": str(lon), "domain": ".swiggy.com", "path": "/"},
+                ])
+                self._located = (lat, lon)
             page = await context.new_page()
             payloads: list[dict] = []
 
@@ -83,14 +86,19 @@ class InstamartScraper(BaseScraper):
                     "**/*",
                     lambda route: route.abort() if route.request.resource_type in ["image", "media", "font"] else route.continue_(),
                 )
-                async with page.expect_response(lambda r: "/api/instamart/search" in r.url and r.status == 200, timeout=35000):
-                    await page.goto(
-                        f"https://www.swiggy.com/instamart/search?custom_back=true&query={quote_plus(query)}",
-                        wait_until="commit",
-                        timeout=25000,
-                    )
+                url = f"https://www.swiggy.com/instamart/search?custom_back=true&query={quote_plus(query)}"
+                for attempt in range(2):
+                    try:
+                        async with page.expect_response(lambda r: "/api/instamart/search" in r.url and r.status == 200, timeout=18000):
+                            await page.goto(url, wait_until="commit", timeout=18000)
+                        break
+                    except Exception:
+                        if attempt:
+                            raise
+                        logger.warning("Instamart search response did not arrive, reloading once")
                 await page.wait_for_timeout(500)
             except Exception as exc:
+                self._located = None
                 logger.error(f"Instamart search failed: {exc}")
             finally:
                 page.remove_listener("response", on_response)
