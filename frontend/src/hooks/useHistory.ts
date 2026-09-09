@@ -27,12 +27,12 @@ export function useHistory(productName: string | null) {
     try {
       const response = await fetch(`/history?name=${encodeURIComponent(name)}`)
       if (!response.ok) {
-        throw new Error(`History fetch failed with status: ${response.status}`)
+        throw new Error(`Could not load the price history (${response.status})`)
       }
       const data: PriceHistoryResponse = await response.json()
       setHistory(data.history || [])
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch price history'
+      const message = err instanceof Error ? err.message : 'Could not load the price history'
       setError(message)
       setHistory([])
     } finally {

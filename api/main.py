@@ -10,7 +10,6 @@ from fastapi.responses import FileResponse
 from api.config import settings
 from api.models import HealthResponse, LocationUpdateRequest, LocationResponse
 from api.search import router as search_router, close_all_scrapers
-from api.auth import router as auth_router
 from api.alerts import router as alerts_router, run_alerts_check_cycle
 from api.geo import geocode_pin, reverse_geocode
 from db.repository import init_database
@@ -50,7 +49,6 @@ app.add_middleware(
 )
 
 app.include_router(search_router)
-app.include_router(auth_router)
 app.include_router(alerts_router)
 
 location_file = settings.data_dir / "location.json"

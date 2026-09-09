@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import select, delete, desc
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from api.config import settings
-from db.schema import Base, Product, PriceSnapshot, Alert, Identity, SearchRecord
+from db.schema import Base, Product, PriceSnapshot, Alert, SearchRecord
 
 logger = logging.getLogger(__name__)
 
@@ -204,42 +204,3 @@ async def update_alert_check_time(alert_id: int) -> None:
                     alert.last_checked = datetime.datetime.utcnow()
     except Exception as exc:
         logger.error(f"Failed to update alert check time: {exc}")
-
-
-async def get_all_identities() -> dict[str, str | None]:
-    try:
-        async with AsyncSessionLocal() as session:
-            stmt = select(Identity)
-            result = await session.execute(stmt)
-            identities = result.scalars().all()
-            return {identity.platform: identity.account for identity in identities}
-    except Exception as exc:
-        logger.error(f"Failed to get identities: {exc}")
-        return {}
-
-
-async def save_identity(platform: str, account: str | None) -> None:
-    try:
-        async with AsyncSessionLocal() as session:
-            async with session.begin():
-                stmt = select(Identity).where(Identity.platform == platform)
-                result = await session.execute(stmt)
-                identity = result.scalars().first()
-                if not identity:
-                    identity = Identity(platform=platform, account=account)
-                    session.add(identity)
-                else:
-                    identity.account = account
-                    identity.updated_at = datetime.datetime.utcnow()
-    except Exception as exc:
-        logger.error(f"Failed to save identity: {exc}")
-
-
-async def remove_identity(platform: str) -> None:
-    try:
-        async with AsyncSessionLocal() as session:
-            async with session.begin():
-                stmt = delete(Identity).where(Identity.platform == platform)
-                await session.execute(stmt)
-    except Exception as exc:
-        logger.error(f"Failed to remove identity: {exc}")

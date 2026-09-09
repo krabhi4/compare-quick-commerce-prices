@@ -129,19 +129,20 @@ async def execute_concurrent_search(
 
     grouped_results = group_products(all_products)
 
-    for product in all_products:
-        await save_product_and_snapshot(
-            normalized_name=product.name,
-            platform=product.platform,
-            name=product.name,
-            price=product.price,
-            pin=pin,
-            quantity=product.quantity,
-            image_url=product.image_url,
-            product_url=product.product_url,
-            mrp=product.mrp,
-            in_stock=product.in_stock,
-        )
+    for group in grouped_results:
+        for product in group.platforms:
+            await save_product_and_snapshot(
+                normalized_name=group.normalized_name,
+                platform=product.platform,
+                name=product.name,
+                price=product.price,
+                pin=pin,
+                quantity=product.quantity,
+                image_url=product.image_url,
+                product_url=product.product_url,
+                mrp=product.mrp,
+                in_stock=product.in_stock,
+            )
 
     response = SearchResponse(
         query=query,

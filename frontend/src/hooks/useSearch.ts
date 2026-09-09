@@ -60,14 +60,14 @@ export function useSearch() {
         })
 
         if (!response.ok) {
-          throw new Error(`Search failed with status: ${response.status}`)
+          throw new Error(`The search failed (${response.status})`)
         }
 
         const data: SearchResponse = await response.json()
         setResults(data.results || [])
         setIsCached(data.cached || false)
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to perform search'
+        const message = err instanceof Error ? err.message : 'Could not reach the server to search'
         setError(message)
         setResults([])
       } finally {

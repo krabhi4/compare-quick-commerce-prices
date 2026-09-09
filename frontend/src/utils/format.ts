@@ -6,15 +6,25 @@ export function formatPrice(price: number): string {
   }).format(price)
 }
 
+export function formatAmount(price: number): string {
+  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(price)
+}
+
+export function formatEta(eta?: string | null): string {
+  if (!eta) return ''
+  const text = eta.trim().toLowerCase()
+  if (text === 'earliest') return 'now'
+  return text.replace(/\s*min(ute)?s?\b/g, 'm').replace(/\s+/g, '')
+}
+
 export function formatDate(dateString: string): string {
   try {
-    const date = new Date(dateString)
     return new Intl.DateTimeFormat('en-IN', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(date)
+    }).format(new Date(dateString))
   } catch {
     return dateString
   }

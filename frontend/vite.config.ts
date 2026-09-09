@@ -9,24 +9,20 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'QuickCompare - Quick-Commerce Price Comparison',
+        name: 'QuickCompare — live grocery prices by pincode',
         short_name: 'QuickCompare',
-        description: 'Real-time price comparison across Blinkit, Zepto, Instamart & more',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        description:
+          'Live prices from Blinkit, Zepto, Instamart, Flipkart Minutes and BigBasket Now, side by side for one pincode.',
+        theme_color: '#edf0ec',
+        background_color: '#edf0ec',
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: 'favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any',
           },
         ],
       },
@@ -37,7 +33,6 @@ export default defineConfig({
       '/search': 'http://localhost:8000',
       '/history': 'http://localhost:8000',
       '/alerts': 'http://localhost:8000',
-      '/auth': 'http://localhost:8000',
       '/location': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
     },

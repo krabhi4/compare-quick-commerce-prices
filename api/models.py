@@ -101,10 +101,6 @@ class LocationResponse(BaseModel):
     lon: float
 
 
-class AuthStatusResponse(BaseModel):
-    identities: dict[str, str | None]
-
-
 class HealthResponse(BaseModel):
     status: str
     version: str

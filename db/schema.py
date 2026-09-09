@@ -55,16 +55,6 @@ class Alert(Base):
     last_checked: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
 
 
-class Identity(Base):
-    __tablename__ = "identities"
-
-    platform: Mapped[str] = mapped_column(String(64), primary_key=True)
-    account: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    updated_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
-    )
-
-
 class SearchRecord(Base):
     __tablename__ = "searches"
 

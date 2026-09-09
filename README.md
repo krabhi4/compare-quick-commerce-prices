@@ -4,7 +4,7 @@ Compare live grocery prices across Blinkit, Zepto, Swiggy Instamart, Flipkart Mi
 
 ## How location works
 
-Every search is keyed on a 6-digit Indian pincode. The backend geocodes it with Nominatim (OpenStreetMap, free, cached in `data/geocache.json`) and passes the coordinates to each store, so results reflect the dark store that actually serves that pincode. "Auto-Detect" uses browser GPS and reverse-geocodes to a pincode.
+Every search is keyed on a 6-digit Indian pincode. The backend geocodes it with Nominatim (OpenStreetMap, free, cached in `data/geocache.json`) and passes the coordinates to each store, so results reflect the dark store that actually serves that pincode. "Use my location" reads browser GPS and reverse-geocodes it to a pincode.
 
 Blinkit, BigBasket and Flipkart Minutes are fetched via their public web APIs with no browser. Instamart and Zepto run inside a headless Chromium because their APIs sit behind browser challenges. A store that does not serve the pincode simply returns no products (for example Zepto does not operate in Patna).
 
@@ -52,7 +52,7 @@ pnpm install
 pnpm dev
 ```
 
-Vite dev server proxies `/search`, `/alerts`, `/history`, `/auth` to port 8000.
+Vite dev server proxies `/search`, `/alerts`, `/history`, `/location`, `/health` to port 8000.
 
 ## API Endpoints
 
@@ -62,9 +62,6 @@ Vite dev server proxies `/search`, `/alerts`, `/history`, `/auth` to port 8000.
 - `GET /alerts`: List active price drop alerts
 - `POST /alerts`: Create new price drop alert
 - `DELETE /alerts/{id}`: Remove price alert
-- `GET /auth/status`: Check platform session statuses
-- `POST /auth/login/{platform}`: Start interactive login session
-- `POST /auth/logout/{platform}`: Clear platform session
 - `GET /health`: Healthcheck
 
 ## Caddy Configuration

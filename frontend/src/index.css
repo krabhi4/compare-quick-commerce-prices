@@ -1,45 +1,118 @@
 @import "tailwindcss";
+@import "@fontsource-variable/archivo/standard.css";
+@import "@fontsource-variable/instrument-sans/standard.css";
 
 @theme {
-  --color-primary: #10b981;
-  --color-primary-hover: #059669;
-  --color-cheapest: #16a34a;
-  --color-cheapest-bg: #dcfce7;
-  --color-cheapest-border: #86efac;
-  --color-blinkit: #f8cb46;
-  --color-zepto: #ec4899;
-  --color-instamart: #f97316;
-  --color-flipkart: #2563eb;
-  --color-bigbasket: #dc2626;
+  --color-*: initial;
+
+  --color-ground: oklch(95.5% 0.008 150);
+  --color-panel: oklch(97.8% 0.005 150);
+  --color-sunk: oklch(92.4% 0.011 150);
+  --color-ink: oklch(24% 0.022 255);
+  --color-ink-2: oklch(46% 0.018 255);
+  --color-ink-3: oklch(64% 0.014 255);
+  --color-rule: oklch(87% 0.010 150);
+  --color-rule-strong: oklch(75% 0.013 150);
+  --color-mark: oklch(52% 0.19 32);
+  --color-mark-wash: oklch(94% 0.035 40);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-board: "Archivo Variable", sans-serif;
+  --font-text: "Instrument Sans Variable", sans-serif;
+
+  --text-micro: 0.6875rem;
+  --text-label: 0.8125rem;
+  --text-body: 0.9375rem;
+  --text-lead: clamp(1.0625rem, 0.95rem + 0.5vw, 1.25rem);
+  --text-rate: clamp(1.75rem, 1.3rem + 2vw, 2.75rem);
+  --text-board: clamp(2.25rem, 1.4rem + 3.6vw, 4rem);
 }
 
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color-scheme: light dark;
+@layer base {
+  html {
+    background-color: var(--color-ground);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-text);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-mark);
+    color: var(--color-panel);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-mark);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input::placeholder {
+    color: var(--color-ink-3);
+  }
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background-color: #0f172a;
-  color: #f8fafc;
-  -webkit-font-smoothing: antialiased;
+@utility board {
+  font-family: var(--font-board);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "ss01";
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@utility tag {
+  font-family: var(--font-board);
+  font-stretch: 78%;
+  font-weight: 650;
+  font-size: var(--text-micro);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
-::-webkit-scrollbar-track {
-  background: #1e293b;
+@utility rate {
+  font-family: var(--font-board);
+  font-variant-numeric: tabular-nums;
+  font-stretch: 112%;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 0.9;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 9999px;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+@utility rise {
+  animation: rise 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

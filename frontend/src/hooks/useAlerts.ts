@@ -22,12 +22,12 @@ export function useAlerts() {
     try {
       const response = await fetch('/alerts')
       if (!response.ok) {
-        throw new Error(`Failed to fetch alerts: ${response.status}`)
+        throw new Error(`Could not load your alerts (${response.status})`)
       }
       const data: Alert[] = await response.json()
       setAlerts(data)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch alerts'
+      const message = err instanceof Error ? err.message : 'Could not load your alerts'
       setError(message)
     } finally {
       setLoading(false)
@@ -52,12 +52,12 @@ export function useAlerts() {
         }),
       })
       if (!response.ok) {
-        throw new Error('Failed to create alert')
+        throw new Error('Could not save the alert')
       }
       await fetchAlerts()
       return true
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error creating alert'
+      const message = err instanceof Error ? err.message : 'Could not save the alert'
       setError(message)
       return false
     }
@@ -69,12 +69,12 @@ export function useAlerts() {
         method: 'DELETE',
       })
       if (!response.ok) {
-        throw new Error('Failed to delete alert')
+        throw new Error('Could not delete the alert')
       }
       setAlerts((prev) => prev.filter((a) => a.id !== alertId))
       return true
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error deleting alert'
+      const message = err instanceof Error ? err.message : 'Could not delete the alert'
       setError(message)
       return false
     }

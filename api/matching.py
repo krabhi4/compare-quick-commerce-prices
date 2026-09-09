@@ -158,14 +158,15 @@ def is_product_match(
     if first_brand and second_brand and first_brand != second_brand:
         return False
 
+    if first_quantity and second_quantity and first_quantity != second_quantity:
+        return False
+
     similarity_score = fuzz.token_sort_ratio(first_cleaned, second_cleaned)
 
     same_brand = bool(first_brand and second_brand and first_brand == second_brand)
     same_quantity = bool(first_quantity and second_quantity and first_quantity == second_quantity)
 
     if similarity_score >= 90 and (same_brand or not first_brand or not second_brand):
-        if first_quantity and second_quantity and not same_quantity:
-            return False
         return True
 
     if similarity_score >= 75 and same_brand and same_quantity:
