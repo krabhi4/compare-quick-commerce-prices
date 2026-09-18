@@ -12,8 +12,18 @@ IMG_PREFIX = "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_l
 def _money(val) -> float | None:
     if isinstance(val, dict):
         units = val.get("units")
-        return None if units in (None, "") else float(units) + float(val.get("nanos") or 0) / 1e9
-    return float(val) if isinstance(val, (int, float, str)) and str(val).strip() else None
+        if units in (None, ""):
+            return None
+        try:
+            return float(units) + float(val.get("nanos") or 0) / 1e9
+        except (ValueError, TypeError):
+            return None
+    if isinstance(val, (int, float, str)) and str(val).strip():
+        try:
+            return float(str(val).replace("₹", "").replace(",", "").strip())
+        except (ValueError, TypeError):
+            return None
+    return None
 
 
 def parse_search(payload: dict) -> list[PlatformProduct]:
@@ -26,7 +36,8 @@ def parse_search(payload: dict) -> list[PlatformProduct]:
             for var in item.get("variations") or []:
                 price_info = var.get("price") or {}
                 name = var.get("displayName") or item.get("displayName")
-                price = _money(price_info.get("offerPrice")) or _money(price_info.get("mrp"))
+                offer_price = _money(price_info.get("offerPrice"))
+                price = offer_price if offer_price is not None else _money(price_info.get("mrp"))
                 if not name or price is None:
                     continue
                 images = var.get("imageIds") or []
@@ -77,8 +88,8 @@ class InstamartScraper(BaseScraper):
                         body = await response.json()
                         if isinstance(body, dict) and body.get("data"):
                             payloads.append(body)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Failed to parse Instamart search response: %s", exc)
 
             page.on("response", on_response)
             try:
@@ -99,7 +110,7 @@ class InstamartScraper(BaseScraper):
                 await page.wait_for_timeout(500)
             except Exception as exc:
                 self._located = None
-                logger.error(f"Instamart search failed: {exc}")
+                logger.error("Instamart search failed: %s", exc)
             finally:
                 page.remove_listener("response", on_response)
                 await page.close()

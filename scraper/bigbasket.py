@@ -29,6 +29,8 @@ def parse_products(payload: dict) -> list[PlatformProduct]:
             name = desc if not brand or desc.lower().startswith(brand.lower()) else f"{brand} {desc}"
             images = item.get("images") or []
             url = item.get("absolute_url")
+            avail_status = (item.get("availability") or {}).get("avail_status")
+            in_stock = (avail_status == "001") if avail_status is not None else False
             products.append(
                 PlatformProduct(
                     platform="bigbasket",
@@ -36,7 +38,7 @@ def parse_products(payload: dict) -> list[PlatformProduct]:
                     price=price,
                     mrp=_money(discount.get("mrp")),
                     quantity=item.get("w") or item.get("pack_desc"),
-                    in_stock=(item.get("availability") or {}).get("avail_status", "001") == "001",
+                    in_stock=in_stock,
                     product_url=f"https://www.bigbasket.com{url}" if url else None,
                     image_url=(images[0].get("m") or images[0].get("s")) if images and isinstance(images[0], dict) else None,
                     eta="15-30 mins",
@@ -65,10 +67,10 @@ class BigBasketScraper(BaseScraper):
             if r.status_code == 204:
                 return []
             if r.status_code == 303:
-                logger.info(f"BigBasket not serviceable at {lat},{lon}")
+                logger.info("BigBasket not serviceable at %s,%s", lat, lon)
                 return []
             r.raise_for_status()
             return parse_products(r.json())
         except Exception as exc:
-            logger.error(f"BigBasket search failed: {exc}")
+            logger.error("BigBasket search failed: %s", exc)
             return []

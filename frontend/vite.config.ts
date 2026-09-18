@@ -17,6 +17,7 @@ export default defineConfig({
         theme_color: '#edf0ec',
         background_color: '#edf0ec',
         display: 'standalone',
+        start_url: '/',
         icons: [
           {
             src: 'favicon.svg',
@@ -30,11 +31,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/search': 'http://localhost:8000',
-      '/history': 'http://localhost:8000',
-      '/alerts': 'http://localhost:8000',
-      '/location': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
+      '/search': process.env.VITE_API_URL || 'http://localhost:8000',
+      '/history': process.env.VITE_API_URL || 'http://localhost:8000',
+      '/alerts': process.env.VITE_API_URL || 'http://localhost:8000',
+      '/location': process.env.VITE_API_URL || 'http://localhost:8000',
+      '/health': process.env.VITE_API_URL || 'http://localhost:8000',
     },
   },
 })

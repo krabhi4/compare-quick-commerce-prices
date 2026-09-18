@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { formatDate } from '../utils/format'
 import { PriceChart } from '../components/PriceChart'
 
@@ -22,24 +22,27 @@ export const HistoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    const controller = new AbortController()
     setLoading(true)
     setError(null)
-    try {
-      const res = await fetch('/history/products')
-      if (!res.ok) throw new Error('Could not load tracked items')
-      const data = await res.json()
-      setProducts(data.products || [])
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not load tracked items')
-    } finally {
-      setLoading(false)
-    }
+    fetch('/history/products', { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Could not load tracked items (${res.status})`)
+        const data = await res.json()
+        setProducts(data.products || [])
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        setError(err instanceof Error ? err.message : 'Could not load tracked items')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      })
+    return () => controller.abort()
   }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const term = filter.toLowerCase()
   const matched = products.filter(
@@ -83,7 +86,7 @@ export const HistoryPage: React.FC = () => {
           {unique.map((product, i) => {
             const isOpen = open === product.normalized_name
             return (
-              <li key={product.id} className="border-t border-rule last:border-b">
+              <li key={product.normalized_name} className="border-t border-rule last:border-b">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? null : product.normalized_name)}
@@ -108,7 +111,7 @@ export const HistoryPage: React.FC = () => {
                     <span className="mt-0.5 block text-micro text-ink-2">
                       {[product.brand, product.quantity].filter(Boolean).join(' · ')}
                       {product.brand || product.quantity ? ' · ' : ''}
-                      updated {formatDate(product.updated_at)}
+                      updated {product.updated_at ? formatDate(product.updated_at) : 'unknown'}
                     </span>
                   </span>
                   <span className="tag shrink-0 text-ink-3">{isOpen ? 'close' : 'trend'}</span>

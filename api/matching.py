@@ -89,6 +89,11 @@ KNOWN_BRANDS: list[str] = [
 ]
 
 
+_BRAND_PATTERNS = [(brand, re.compile(r"\b" + re.escape(brand) + r"\b")) for brand in KNOWN_BRANDS]
+_MULTIPLIER_PATTERN = re.compile(r"(\d+)\s*[xX*]\s*(\d+(?:\.\d+)?)\s*(kg|g|gm|gms|l|ltr|litre|litres|ml)")
+_SINGLE_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*(kg|g|gm|gms|l|ltr|litre|litres|ml|piece|pieces|pc|pcs)")
+
+
 def clean_name(name: str) -> str:
     cleaned = name.lower()
     cleaned = re.sub(r"\(.*?\)", "", cleaned)
@@ -100,9 +105,8 @@ def clean_name(name: str) -> str:
 
 def extract_brand(name: str) -> str | None:
     lowered = name.lower()
-    for brand in KNOWN_BRANDS:
-        pattern = r"\b" + re.escape(brand) + r"\b"
-        if re.search(pattern, lowered):
+    for brand, pattern in _BRAND_PATTERNS:
+        if pattern.search(lowered):
             return brand
     return None
 
@@ -114,35 +118,35 @@ def normalize_quantity(text: str | None) -> str | None:
     lowered = text.lower().strip()
     lowered = lowered.replace(" ", "")
 
-    multiplier_match = re.search(r"(\d+)\s*[xX*]\s*(\d+(?:\.\d+)?)\s*(kg|g|gm|gms|l|ltr|litre|litres|ml)", lowered)
+    multiplier_match = _MULTIPLIER_PATTERN.search(lowered)
     if multiplier_match:
         count = int(multiplier_match.group(1))
         unit_val = float(multiplier_match.group(2))
         unit = multiplier_match.group(3)
         total = count * unit_val
         if unit in ["kg"]:
-            return f"{int(total * 1000)}g"
+            return f"{round(total * 1000)}g"
         if unit in ["l", "ltr", "litre", "litres"]:
-            return f"{int(total * 1000)}ml"
+            return f"{round(total * 1000)}ml"
         if unit in ["g", "gm", "gms"]:
-            return f"{int(total)}g"
+            return f"{round(total)}g"
         if unit in ["ml"]:
-            return f"{int(total)}ml"
+            return f"{round(total)}ml"
 
-    single_match = re.search(r"(\d+(?:\.\d+)?)\s*(kg|g|gm|gms|l|ltr|litre|litres|ml|piece|pieces|pc|pcs)", lowered)
+    single_match = _SINGLE_PATTERN.search(lowered)
     if single_match:
         val = float(single_match.group(1))
         unit = single_match.group(2)
         if unit in ["kg"]:
-            return f"{int(val * 1000)}g"
+            return f"{round(val * 1000)}g"
         if unit in ["l", "ltr", "litre", "litres"]:
-            return f"{int(val * 1000)}ml"
+            return f"{round(val * 1000)}ml"
         if unit in ["g", "gm", "gms"]:
-            return f"{int(val)}g"
+            return f"{round(val)}g"
         if unit in ["ml"]:
-            return f"{int(val)}ml"
+            return f"{round(val)}ml"
         if unit in ["piece", "pieces", "pc", "pcs"]:
-            return f"{int(val)}pcs"
+            return f"{round(val)}pcs"
 
     return text.strip()
 
@@ -180,8 +184,8 @@ def is_product_match(
 
 def build_grouped_product(normalized_name: str, products: list[PlatformProduct]) -> GroupedProduct:
     cheapest = min(products, key=lambda item: item.price)
-    brand = extract_brand(products[0].name)
-    quantity = normalize_quantity(products[0].quantity or products[0].name)
+    brand = extract_brand(cheapest.name) or extract_brand(products[0].name)
+    quantity = normalize_quantity(cheapest.quantity or cheapest.name) or normalize_quantity(products[0].quantity or products[0].name)
 
     return GroupedProduct(
         normalized_name=normalized_name,

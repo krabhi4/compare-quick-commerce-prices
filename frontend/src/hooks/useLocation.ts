@@ -21,11 +21,16 @@ export function useLocation() {
       if (response.ok) {
         const data: LocationData = await response.json()
         setLocation(data)
+      } else {
+        const body = await response.json().catch(() => ({}))
+        setError(body.detail || `Could not load location (${response.status})`)
       }
     } catch {
       const savedPin = localStorage.getItem('qc_pincode')
       if (savedPin) {
         setLocation((prev) => ({ ...prev, pin: savedPin }))
+      } else {
+        setError('Could not reach the server to load location')
       }
     }
   }, [])
@@ -62,8 +67,16 @@ export function useLocation() {
         await updateLocation(undefined, pos.coords.latitude, pos.coords.longitude)
         setDetecting(false)
       },
-      () => {
-        setError('Location permission denied')
+      (err) => {
+        let message = 'Location detection failed'
+        if (err.code === err.PERMISSION_DENIED) {
+          message = 'Location permission denied'
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          message = 'Location information is unavailable'
+        } else if (err.code === err.TIMEOUT) {
+          message = 'Location request timed out'
+        }
+        setError(message)
         setDetecting(false)
       }
     )

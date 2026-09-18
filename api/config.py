@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,8 +28,17 @@ class Settings(BaseSettings):
     enable_flipkart: bool = True
     enable_bigbasket: bool = True
 
+    @model_validator(mode="after")
+    def _sync_database_url(self) -> "Settings":
+        if "database_url" not in self.model_fields_set:
+            self.database_url = f"sqlite+aiosqlite:///{self.data_dir / 'comparator.db'}"
+        return self
+
 
 settings = Settings()
-os.makedirs(settings.data_dir, exist_ok=True)
-os.makedirs(settings.data_dir / "profiles", exist_ok=True)
-os.makedirs(settings.data_dir / "debug", exist_ok=True)
+
+
+def init_dirs(target_settings: Settings = settings) -> None:
+    os.makedirs(target_settings.data_dir, exist_ok=True)
+    os.makedirs(target_settings.data_dir / "profiles", exist_ok=True)
+    os.makedirs(target_settings.data_dir / "debug", exist_ok=True)

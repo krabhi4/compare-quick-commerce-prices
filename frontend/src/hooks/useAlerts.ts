@@ -16,21 +16,26 @@ export function useAlerts() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchAlerts = useCallback(async () => {
+  const fetchAlerts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/alerts')
+      const response = await fetch('/alerts', { signal })
       if (!response.ok) {
         throw new Error(`Could not load your alerts (${response.status})`)
       }
       const data: Alert[] = await response.json()
       setAlerts(data)
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       const message = err instanceof Error ? err.message : 'Could not load your alerts'
       setError(message)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) {
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -40,14 +45,21 @@ export function useAlerts() {
     pin: string,
     platform?: string
   ): Promise<boolean> => {
+    const trimmedQuery = product_query.trim()
+    const trimmedPin = pin.trim()
+    if (!trimmedQuery || !Number.isFinite(target_price) || target_price <= 0 || trimmedPin.length !== 6) {
+      setError('Please provide a valid item name, positive price, and 6-digit pincode')
+      return false
+    }
+
     try {
       const response = await fetch('/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_query,
+          product_query: trimmedQuery,
           target_price,
-          pin,
+          pin: trimmedPin,
           platform: platform || undefined,
         }),
       })
@@ -64,6 +76,8 @@ export function useAlerts() {
   }
 
   const removeAlert = async (alertId: number): Promise<boolean> => {
+    const previous = alerts
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId))
     try {
       const response = await fetch(`/alerts/${alertId}`, {
         method: 'DELETE',
@@ -71,9 +85,9 @@ export function useAlerts() {
       if (!response.ok) {
         throw new Error('Could not delete the alert')
       }
-      setAlerts((prev) => prev.filter((a) => a.id !== alertId))
       return true
     } catch (err: unknown) {
+      setAlerts(previous)
       const message = err instanceof Error ? err.message : 'Could not delete the alert'
       setError(message)
       return false
@@ -81,7 +95,11 @@ export function useAlerts() {
   }
 
   useEffect(() => {
-    fetchAlerts()
+    const controller = new AbortController()
+    fetchAlerts(controller.signal)
+    return () => {
+      controller.abort()
+    }
   }, [fetchAlerts])
 
   return {

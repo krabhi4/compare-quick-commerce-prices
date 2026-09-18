@@ -9,9 +9,14 @@
       name="description"
       content="Live grocery prices from Blinkit, Zepto, Instamart, Flipkart Minutes and BigBasket Now, side by side for one pincode."
     />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http: https:;" />
+    <meta http-equiv="Permissions-Policy" content="geolocation=(self), camera=(), microphone=()" />
     <title>QuickCompare</title>
   </head>
   <body>
+    <noscript>
+      <p>Please enable JavaScript to use QuickCompare.</p>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

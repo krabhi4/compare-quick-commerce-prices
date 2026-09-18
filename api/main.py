@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from api.config import settings
+from api.config import settings, init_dirs
 from api.models import HealthResponse, LocationUpdateRequest, LocationResponse
 from api.search import router as search_router, close_all_scrapers
 from api.alerts import router as alerts_router, run_alerts_check_cycle
@@ -23,6 +23,7 @@ logger = logging.getLogger("api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_dirs()
     await init_database()
     alert_task = asyncio.create_task(run_alerts_check_cycle())
     yield
@@ -43,7 +44,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -52,6 +53,8 @@ app.include_router(search_router)
 app.include_router(alerts_router)
 
 location_file = settings.data_dir / "location.json"
+current_location_lock = asyncio.Lock()
+
 
 def load_persisted_location() -> dict:
     try:
@@ -62,21 +65,24 @@ def load_persisted_location() -> dict:
                 "lat": data.get("lat", settings.default_lat),
                 "lon": data.get("lon", settings.default_lon),
             }
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to load persisted location: %s", exc)
     return {
         "pin": settings.default_pin,
         "lat": settings.default_lat,
         "lon": settings.default_lon,
     }
 
+
 current_location = load_persisted_location()
 
-def persist_location() -> None:
+
+async def persist_location() -> None:
     try:
-        location_file.write_text(json.dumps(current_location))
+        await asyncio.to_thread(location_file.write_text, json.dumps(current_location))
     except Exception as exc:
-        logger.warning(f"Failed to persist location: {exc}")
+        logger.warning("Failed to persist location: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to persist location")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -86,22 +92,23 @@ async def health_check() -> HealthResponse:
 
 @app.post("/location", response_model=LocationResponse)
 async def set_location(update: LocationUpdateRequest) -> LocationResponse:
-    if update.pin:
-        place = await geocode_pin(update.pin)
-        if not place:
-            raise HTTPException(status_code=400, detail=f"Could not locate pincode {update.pin}")
-        near = update.lat is not None and update.lon is not None and abs(update.lat - place["lat"]) < 0.5 and abs(update.lon - place["lon"]) < 0.5
-        current_location.update(pin=update.pin, lat=update.lat if near else place["lat"], lon=update.lon if near else place["lon"])
-    elif update.lat is not None and update.lon is not None:
-        place = await reverse_geocode(update.lat, update.lon)
-        pin = (place or {}).get("postcode", "")
-        if not (pin.isdigit() and len(pin) == 6):
-            raise HTTPException(status_code=400, detail="Could not resolve a pincode for this position")
-        current_location.update(pin=pin, lat=update.lat, lon=update.lon)
-    else:
-        raise HTTPException(status_code=400, detail="Provide a pincode or coordinates")
-    persist_location()
-    return LocationResponse(**current_location)
+    async with current_location_lock:
+        if update.pin:
+            place = await geocode_pin(update.pin)
+            if not place:
+                raise HTTPException(status_code=400, detail=f"Could not locate pincode {update.pin}")
+            near = update.lat is not None and update.lon is not None and abs(update.lat - place["lat"]) < 0.5 and abs(update.lon - place["lon"]) < 0.5
+            current_location.update(pin=update.pin, lat=update.lat if near else place["lat"], lon=update.lon if near else place["lon"])
+        elif update.lat is not None and update.lon is not None:
+            place = await reverse_geocode(update.lat, update.lon)
+            pin = (place or {}).get("postcode", "")
+            if not (pin.isdigit() and len(pin) == 6):
+                raise HTTPException(status_code=400, detail="Could not resolve a pincode for this position")
+            current_location.update(pin=pin, lat=update.lat, lon=update.lon)
+        else:
+            raise HTTPException(status_code=400, detail="Provide a pincode or coordinates")
+        await persist_location()
+        return LocationResponse(**current_location)
 
 
 @app.get("/location", response_model=LocationResponse)
@@ -119,10 +126,16 @@ if frontend_dist_dir.exists():
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        file_path = frontend_dist_dir / full_path
+        base_dir = frontend_dist_dir.resolve()
+        try:
+            file_path = (frontend_dist_dir / full_path).resolve()
+            if not file_path.is_relative_to(base_dir):
+                raise HTTPException(status_code=404, detail="Not found")
+        except (ValueError, RuntimeError):
+            raise HTTPException(status_code=404, detail="Not found")
         if file_path.is_file():
             return FileResponse(file_path)
         index_path = frontend_dist_dir / "index.html"
         if index_path.is_file():
             return FileResponse(index_path)
-        return {"error": "Frontend not built yet"}
+        raise HTTPException(status_code=404, detail="Frontend not built yet")

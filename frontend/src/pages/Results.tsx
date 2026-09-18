@@ -25,9 +25,23 @@ const SORTS: { id: SortOption; label: string }[] = [
 const GRID =
   'grid grid-cols-[repeat(6,minmax(0,1fr))] md:grid-cols-[minmax(13rem,1.7fr)_repeat(5,minmax(3.25rem,1fr))_minmax(3.5rem,0.6fr)]'
 
+const isSafeUrl = (url?: string | null) => {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 const spread = (p: GroupedProduct) => {
-  const prices = p.platforms.map((x) => x.price)
-  return Math.max(...prices) - Math.min(...prices)
+  const prices = p.platforms.map((x) => x.price).filter((price) => Number.isFinite(price))
+  if (prices.length === 0) return 0
+  return (
+    prices.reduce((a, b) => Math.max(a, b), prices[0]) -
+    prices.reduce((a, b) => Math.min(a, b), prices[0])
+  )
 }
 
 export const ResultsPage: React.FC<ResultsPageProps> = ({
@@ -39,17 +53,31 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
   onSetAlert,
 }) => {
   const [sortBy, setSortBy] = useState<SortOption>('savings')
-  const [openTrend, setOpenTrend] = useState<number | null>(null)
+  const [openTrend, setOpenTrend] = useState<string | null>(null)
   const [showSingles, setShowSingles] = useState(false)
 
   const { compared, singles } = useMemo(() => {
     const multi = results.filter((r) => r.platforms.length > 1)
-    if (sortBy === 'cheapest') multi.sort((a, b) => a.cheapest_price - b.cheapest_price)
-    if (sortBy === 'savings') multi.sort((a, b) => spread(b) - spread(a))
-    if (sortBy === 'stores') multi.sort((a, b) => b.platforms.length - a.platforms.length)
+    if (sortBy === 'cheapest') {
+      multi.sort(
+        (a, b) =>
+          (Number.isFinite(a.cheapest_price) ? a.cheapest_price : 0) -
+          (Number.isFinite(b.cheapest_price) ? b.cheapest_price : 0)
+      )
+    }
+    if (sortBy === 'savings') {
+      multi.sort((a, b) => spread(b) - spread(a))
+    }
+    if (sortBy === 'stores') {
+      multi.sort((a, b) => b.platforms.length - a.platforms.length)
+    }
     const one = results
       .filter((r) => r.platforms.length === 1)
-      .sort((a, b) => a.cheapest_price - b.cheapest_price)
+      .sort(
+        (a, b) =>
+          (Number.isFinite(a.cheapest_price) ? a.cheapest_price : 0) -
+          (Number.isFinite(b.cheapest_price) ? b.cheapest_price : 0)
+      )
     return { compared: multi, singles: one }
   }, [results, sortBy])
 
@@ -145,15 +173,17 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
             </div>
 
             {compared.map((product, i) => (
-              <React.Fragment key={`${product.normalized_name}-${i}`}>
+              <React.Fragment key={product.normalized_name}>
                 <PriceRow
                   product={product}
                   index={i}
-                  expanded={openTrend === i}
-                  onToggleHistory={() => setOpenTrend((cur) => (cur === i ? null : i))}
+                  expanded={openTrend === product.normalized_name}
+                  onToggleHistory={() =>
+                    setOpenTrend((cur) => (cur === product.normalized_name ? null : product.normalized_name))
+                  }
                   onSetAlert={onSetAlert}
                 />
-                {openTrend === i && (
+                {openTrend === product.normalized_name && (
                   <div className="col-span-full border-t border-dashed border-rule-strong bg-panel px-1">
                     <PriceChart productName={product.normalized_name} />
                   </div>
@@ -183,7 +213,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
                 const only = product.platforms[0]
                 return (
                   <li
-                    key={`${product.normalized_name}-single-${i}`}
+                    key={`${product.normalized_name}-${only?.platform ?? i}`}
                     className="flex items-baseline gap-4 border-b border-rule py-2"
                   >
                     <span className="board min-w-0 flex-1 truncate text-label [font-stretch:92%]">
@@ -198,9 +228,9 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({
                     <span className="tag hidden shrink-0 text-ink-3 sm:inline">
                       {formatEta(only.eta)}
                     </span>
-                    {only.product_url ? (
+                    {isSafeUrl(only.product_url) ? (
                       <a
-                        href={only.product_url}
+                        href={only.product_url ?? '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rate w-14 shrink-0 text-right text-label text-ink transition-colors hover:text-mark"

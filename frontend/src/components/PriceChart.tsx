@@ -24,17 +24,6 @@ const PANEL = 'oklch(97.8% 0.005 150)'
 export const PriceChart: React.FC<{ productName: string }> = ({ productName }) => {
   const { history, loading, error } = useHistory(productName)
 
-  const rows: Record<string, Record<string, number | string>> = {}
-  history.forEach((item: PriceHistoryItem) => {
-    const key = formatDate(item.scraped_at)
-    rows[key] ??= { time: key }
-    rows[key][item.platform] = item.price
-  })
-  const data = Object.values(rows).reverse()
-
-  const seen = PLATFORM_ORDER.filter((p) => history.some((h) => h.platform === p))
-  const prices = history.map((h) => h.price)
-
   if (loading) {
     return <p className="tag px-1 py-6 text-ink-3">reading snapshots…</p>
   }
@@ -43,16 +32,28 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
     return <p className="tag px-1 py-6 text-mark">{error}</p>
   }
 
-  if (history.length === 0) {
+  const safeHistory = Array.isArray(history) ? history : []
+  if (safeHistory.length === 0) {
     return (
       <p className="px-1 py-6 text-label text-ink-2">This item has no snapshots yet.</p>
     )
   }
 
+  const rows: Record<string, Record<string, number | string>> = {}
+  safeHistory.forEach((item: PriceHistoryItem) => {
+    const key = formatDate(item.scraped_at)
+    rows[key] ??= { time: key }
+    rows[key][item.platform] = item.price
+  })
+  const data = Object.values(rows).reverse()
+
+  const seen = PLATFORM_ORDER.filter((p) => safeHistory.some((h) => h.platform === p))
+  const prices = safeHistory.map((h) => h.price).filter((p) => Number.isFinite(p))
+
   const stats: [string, number][] = [
-    ['low', Math.min(...prices)],
-    ['mean', Math.round(prices.reduce((a, c) => a + c, 0) / prices.length)],
-    ['high', Math.max(...prices)],
+    ['low', prices.reduce((a, c) => Math.min(a, c), prices[0] ?? 0)],
+    ['mean', prices.length > 0 ? Math.round(prices.reduce((a, c) => a + c, 0) / prices.length) : 0],
+    ['high', prices.reduce((a, c) => Math.max(a, c), prices[0] ?? 0)],
   ]
 
   return (
@@ -96,7 +97,10 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
                 fontSize: 12,
                 color: INK,
               }}
-              formatter={(value: unknown) => formatPrice(Number(value))}
+              formatter={(value: unknown) => {
+                const num = Number(value)
+                return Number.isFinite(num) ? formatPrice(num) : '—'
+              }}
             />
             <Legend
               wrapperStyle={{ fontSize: 11, paddingTop: 8, color: INK_2 }}

@@ -55,13 +55,16 @@ function Cell({
     !entry.in_stock ? 'opacity-45' : ''
   }`
 
-  if (!entry.product_url) {
+  const isSafeUrl =
+    entry.product_url && /^https?:\/\//i.test(entry.product_url)
+
+  if (!isSafeUrl) {
     return <div className={shell}>{body}</div>
   }
 
   return (
     <a
-      href={entry.product_url}
+      href={entry.product_url!}
       target="_blank"
       rel="noopener noreferrer"
       title={`Open on ${PLATFORM_INFO[platform]?.name ?? platform}`}
@@ -131,7 +134,7 @@ export const PriceRow: React.FC<PriceRowProps> = ({
           key={key}
           platform={key}
           entry={byPlatform.get(key)}
-          cheapest={savings > 0 && key === product.cheapest_platform.toLowerCase()}
+          cheapest={savings > 0 && key === product.cheapest_platform?.toLowerCase()}
         />
       ))}
 

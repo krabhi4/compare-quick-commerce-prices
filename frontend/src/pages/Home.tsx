@@ -12,9 +12,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onQuickSearch }) => (
     <div className="grid grid-cols-2 gap-x-6 border-y-2 border-ink py-2 sm:grid-cols-3 lg:grid-cols-5">
       {PLATFORM_ORDER.map((key) => (
         <div key={key} className="flex items-baseline gap-2">
-          <p className="tag text-mark">{PLATFORM_INFO[key].short}</p>
+          <p className="tag text-mark">{PLATFORM_INFO[key]?.short ?? key}</p>
           <p className="board text-micro [font-stretch:88%] text-ink-2">
-            {PLATFORM_INFO[key].name}
+            {PLATFORM_INFO[key]?.name ?? key}
           </p>
         </div>
       ))}

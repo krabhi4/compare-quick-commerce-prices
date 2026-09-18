@@ -24,13 +24,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [editingPin, setEditingPin] = useState(false)
 
   useEffect(() => {
-    setPin(currentPin)
-  }, [currentPin])
+    if (!editingPin) {
+      setPin(currentPin)
+    }
+  }, [currentPin, editingPin])
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim() || loading) return
-    onSearch(query.trim(), currentPin)
+    onSearch(query.trim(), pin.length === 6 ? pin : currentPin)
   }
 
   const savePin = () => {
@@ -80,8 +82,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onKeyDown={(e) => e.key === 'Enter' && savePin()}
               className="board w-20 border-b border-ink bg-transparent text-label tracking-[0.15em] outline-none"
             />
-            <button type="button" onClick={savePin} className="tag text-mark">
+            <button
+              type="button"
+              onClick={savePin}
+              disabled={pin.length !== 6}
+              className="tag text-mark disabled:text-ink-3 disabled:cursor-not-allowed"
+            >
               set
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPin(currentPin)
+                setEditingPin(false)
+              }}
+              className="tag text-ink-3 hover:text-ink"
+            >
+              cancel
             </button>
             <button
               type="button"

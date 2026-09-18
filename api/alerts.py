@@ -53,6 +53,8 @@ async def list_price_alerts() -> list[AlertResponse]:
 
 @router.delete("/{alert_id}")
 async def remove_price_alert(alert_id: int) -> dict[str, bool]:
+    if alert_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid alert id")
     success = await delete_alert(alert_id)
     if not success:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -73,19 +75,22 @@ async def run_alerts_check_cycle() -> None:
                         pin=alert.pin,
                         platforms=[alert.platform] if alert.platform else None,
                     )
+                    clean_query = alert.product_query.replace("\r", "").replace("\n", "")
                     for group in search_result.results:
                         if group.cheapest_price <= alert.target_price:
                             logger.info(
-                                f"Alert triggered for query '{alert.product_query}': "
-                                f"found price ₹{group.cheapest_price} on {group.cheapest_platform} "
-                                f"(target: ₹{alert.target_price})"
+                                "Alert triggered for query '%s': found price ₹%s on %s (target: ₹%s)",
+                                clean_query,
+                                group.cheapest_price,
+                                group.cheapest_platform,
+                                alert.target_price,
                             )
                     await update_alert_check_time(alert.id)
                 except Exception as exc:
-                    logger.error(f"Error checking alert {alert.id}: {exc}")
+                    logger.error("Error checking alert %s: %s", alert.id, exc)
 
                 await asyncio.sleep(2)
         except Exception as exc:
-            logger.error(f"Alerts background cycle error: {exc}")
+            logger.error("Alerts background cycle error: %s", exc)
 
         await asyncio.sleep(settings.alert_check_interval_seconds)

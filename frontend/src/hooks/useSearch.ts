@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
 export interface PlatformProduct {
   platform: string
@@ -35,10 +35,15 @@ export function useSearch() {
   const [error, setError] = useState<string | null>(null)
   const [isCached, setIsCached] = useState<boolean>(false)
   const [lastQuery, setLastQuery] = useState<string>('')
+  const abortRef = useRef<AbortController | null>(null)
 
   const executeSearch = useCallback(
     async (query: string, pin: string, platforms?: string[], lat?: number, lon?: number) => {
       if (!query.trim()) return
+
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
 
       setLoading(true)
       setError(null)
@@ -57,21 +62,38 @@ export function useSearch() {
             lon: lon,
             platforms: platforms && platforms.length > 0 ? platforms : undefined,
           }),
+          signal: controller.signal,
         })
 
         if (!response.ok) {
-          throw new Error(`The search failed (${response.status})`)
+          let serverMessage = ''
+          try {
+            const errBody = await response.json()
+            serverMessage = typeof errBody?.detail === 'string' ? errBody.detail : ''
+          } catch {
+            serverMessage = ''
+          }
+          throw new Error(
+            serverMessage
+              ? `The search failed: ${serverMessage}`
+              : `The search failed (${response.status})`
+          )
         }
 
         const data: SearchResponse = await response.json()
         setResults(data.results || [])
         setIsCached(data.cached || false)
       } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         const message = err instanceof Error ? err.message : 'Could not reach the server to search'
         setError(message)
         setResults([])
       } finally {
-        setLoading(false)
+        if (abortRef.current === controller) {
+          setLoading(false)
+        }
       }
     },
     []
@@ -84,6 +106,5 @@ export function useSearch() {
     isCached,
     lastQuery,
     executeSearch,
-    setResults,
   }
 }

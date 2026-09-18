@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from urllib.parse import urlparse
 from curl_cffi import requests
 from api.models import PlatformProduct
 from scraper.base import BaseScraper
@@ -15,6 +16,16 @@ def _text(val) -> str | None:
     return str(val).strip() if val else None
 
 
+def _safe_float(val) -> float | None:
+    if val in (None, ""):
+        return None
+    try:
+        clean = str(val).replace("₹", "").replace(",", "").strip()
+        return float(clean)
+    except (ValueError, TypeError):
+        return None
+
+
 def parse_snippets(snippets: list[dict]) -> list[PlatformProduct]:
     products: list[PlatformProduct] = []
     for snippet in snippets:
@@ -23,17 +34,17 @@ def parse_snippets(snippets: list[dict]) -> list[PlatformProduct]:
         data = snippet.get("data") or {}
         item = ((data.get("atc_action") or {}).get("add_to_cart") or {}).get("cart_item") or {}
         name = item.get("product_name") or _text(data.get("name"))
-        price = item.get("price")
+        price = _safe_float(item.get("price"))
         if not name or price is None:
             continue
-        product_id = item.get("product_id") or data.get("product_id")
+        product_id = item.get("product_id") if item.get("product_id") is not None else data.get("product_id")
         inventory = item.get("inventory", data.get("inventory", 1)) or 0
         products.append(
             PlatformProduct(
                 platform="blinkit",
                 name=name,
-                price=float(price),
-                mrp=float(item["mrp"]) if item.get("mrp") else None,
+                price=price,
+                mrp=_safe_float(item.get("mrp")),
                 quantity=item.get("unit") or _text(data.get("variant")),
                 in_stock=inventory > 0 and not data.get("is_sold_out", False),
                 product_url=f"https://blinkit.com/prn/{product_id}" if product_id else None,
@@ -55,7 +66,7 @@ class BlinkitScraper(BaseScraper):
         for _ in range(pages):
             r = requests.post(url, params=params, headers=headers, impersonate="chrome", timeout=20)
             if r.status_code == 400 and "serviceable" in r.text:
-                logger.info(f"Blinkit not serviceable at {lat},{lon}")
+                logger.info("Blinkit not serviceable at %s,%s", lat, lon)
                 break
             r.raise_for_status()
             response = r.json().get("response") or {}
@@ -63,7 +74,14 @@ class BlinkitScraper(BaseScraper):
             next_url = (response.get("pagination") or {}).get("next_url")
             if not next_url:
                 break
-            url, params = "https://blinkit.com" + next_url, None
+            if str(next_url).startswith(("http://", "https://")):
+                parsed = urlparse(next_url)
+                if parsed.netloc not in ("blinkit.com", "www.blinkit.com"):
+                    break
+                url, params = next_url, None
+            else:
+                path = "/" + str(next_url).lstrip("/")
+                url, params = f"https://blinkit.com{path}", None
         return snippets
 
     async def search(
@@ -74,6 +92,6 @@ class BlinkitScraper(BaseScraper):
         try:
             snippets = await asyncio.to_thread(self._fetch, query, lat, lon)
         except Exception as exc:
-            logger.error(f"Blinkit search failed: {exc}")
+            logger.error("Blinkit search failed: %s", exc)
             return []
         return parse_snippets(snippets)

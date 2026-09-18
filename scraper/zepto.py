@@ -14,12 +14,15 @@ def _is_search_response(response) -> bool:
     return "user-search-service/api/v3/search" in response.url and "/filters" not in response.url and response.status == 200
 
 
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
 def _rupees(paise) -> float | None:
     return round(float(paise) / 100, 2) if paise not in (None, "") else None
 
 
 def _slug(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return _SLUG_RE.sub("-", name.lower()).strip("-")
 
 
 def grid_items(payload: dict) -> list[dict]:
@@ -37,7 +40,12 @@ def parse_items(items: list[dict]) -> list[PlatformProduct]:
         product = pr.get("product") or {}
         variant = pr.get("productVariant") or {}
         name = product.get("name")
-        price = _rupees(pr.get("discountedSellingPrice") or pr.get("sellingPrice") or pr.get("mrp"))
+        raw_price = pr.get("discountedSellingPrice")
+        if raw_price is None:
+            raw_price = pr.get("sellingPrice")
+        if raw_price is None:
+            raw_price = pr.get("mrp")
+        price = _rupees(raw_price)
         if not name or price is None:
             continue
         images = variant.get("images") or []
@@ -104,7 +112,7 @@ class ZeptoScraper(BaseScraper):
                     self._serviceable = await self._set_location(context, page, pin)
                     self._located_pin = pin
                 if not self._serviceable:
-                    logger.info(f"Zepto does not serve pincode {pin}")
+                    logger.info("Zepto does not serve pincode %s", pin)
                     return []
                 async with page.expect_response(_is_search_response, timeout=30000) as first:
                     await page.goto(f"{HOME}search?query={quote_plus(query.strip())}", wait_until="commit", timeout=30000)
@@ -113,12 +121,12 @@ class ZeptoScraper(BaseScraper):
                     async with page.expect_response(_is_search_response, timeout=6000) as more:
                         await page.mouse.wheel(0, 8000)
                     items += grid_items(await (await more.value).json())
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Zepto infinite scroll fetch failed: %s", exc)
                 return parse_items(items)
             except Exception as exc:
                 self._located_pin = None
-                logger.error(f"Zepto search failed: {exc}")
+                logger.error("Zepto search failed: %s", exc)
                 return []
             finally:
                 await page.close()

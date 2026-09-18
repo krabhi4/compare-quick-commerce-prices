@@ -40,12 +40,15 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const base = 'QuickCompare'
+    const query = lastQuery?.trim()
+    const pin = location?.pin?.trim()
     if (activeTab === 'trends') document.title = `Trends · ${base}`
     else if (activeTab === 'alerts') document.title = `Alerts · ${base}`
-    else if (loading) document.title = `Reading ${lastQuery}... · ${base}`
-    else if (lastQuery) document.title = `${lastQuery} · ${location.pin} · ${base}`
+    else if (loading && query) document.title = `Reading ${query}... · ${base}`
+    else if (query && pin) document.title = `${query} · ${pin} · ${base}`
+    else if (query) document.title = `${query} · ${base}`
     else document.title = base
-  }, [activeTab, loading, lastQuery, location.pin])
+  }, [activeTab, loading, lastQuery, location?.pin])
 
   const handleSearch = (query: string, pin: string) => {
     setActiveTab('board')

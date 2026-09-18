@@ -12,10 +12,22 @@ export const PLATFORM_INFO: Record<string, PlatformMeta> = {
   bigbasket: { id: 'bigbasket', name: 'BigBasket Now', short: 'BGBK' },
 }
 
-export const PLATFORM_ORDER = Object.keys(PLATFORM_INFO)
+export const PLATFORM_ORDER: readonly string[] = [
+  'blinkit',
+  'zepto',
+  'instamart',
+  'flipkart',
+  'bigbasket',
+]
 
 export function getPlatformMeta(platformKey: string): PlatformMeta {
-  const key = platformKey.toLowerCase()
+  if (!platformKey || typeof platformKey !== 'string') {
+    return { id: 'unknown', name: 'Unknown', short: 'UNKN' }
+  }
+  const key = platformKey.trim().toLowerCase()
+  if (!key) {
+    return { id: 'unknown', name: 'Unknown', short: 'UNKN' }
+  }
   return (
     PLATFORM_INFO[key] || {
       id: key,

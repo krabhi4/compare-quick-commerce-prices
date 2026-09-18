@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from urllib.parse import quote_plus
 import httpx
@@ -9,6 +10,16 @@ logger = logging.getLogger(__name__)
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 HEADERS = {"X-User-Agent": f"{UA} FKUA/website/42/website/Desktop", "User-Agent": UA, "Origin": "https://www.flipkart.com"}
+
+
+def _safe_float(val) -> float | None:
+    if val in (None, ""):
+        return None
+    try:
+        clean = str(val).replace("₹", "").replace(",", "").strip()
+        return float(clean)
+    except (ValueError, TypeError):
+        return None
 
 
 def _image(images: list) -> str | None:
@@ -28,17 +39,17 @@ def parse_page(payload: dict) -> list[PlatformProduct]:
             value = (item.get("productInfo") or {}).get("value") or {}
             titles = value.get("titles") or {}
             pricing = value.get("pricing") or {}
-            price = (pricing.get("finalPrice") or {}).get("value")
+            price = _safe_float((pricing.get("finalPrice") or {}).get("value"))
             if not titles.get("title") or price is None:
                 continue
-            mrp = (pricing.get("mrp") or {}).get("value")
+            mrp = _safe_float((pricing.get("mrp") or {}).get("value"))
             base_url = value.get("baseUrl")
             products.append(
                 PlatformProduct(
                     platform="flipkart",
                     name=titles["title"].strip(),
-                    price=float(price),
-                    mrp=float(mrp) if mrp else None,
+                    price=price,
+                    mrp=mrp,
                     quantity=titles.get("subtitle"),
                     in_stock=(value.get("availability") or {}).get("displayState", "IN_STOCK") == "IN_STOCK",
                     product_url=f"https://www.flipkart.com{base_url}" if base_url else None,
@@ -66,7 +77,11 @@ class FlipkartScraper(BaseScraper):
         client = self._get_client()
         for _ in range(2):
             r = await client.post(f"https://{self._dc}.rome.api.flipkart.com/api/4/{path}", json=body)
-            data = r.json() if r.content else {}
+            try:
+                data = r.json() if r.content else {}
+            except Exception:
+                r.raise_for_status()
+                raise
             if r.status_code == 406 and data.get("ERROR_CODE") == 2000:
                 self._dc = data["META_INFO"]["dcInfo"]["id"]
                 continue
@@ -75,7 +90,12 @@ class FlipkartScraper(BaseScraper):
         raise RuntimeError("Flipkart data-centre redirect loop")
 
     async def _ensure_location(self, pin: str, lat: float, lon: float) -> None:
-        if self._located == (pin, lat, lon):
+        if (
+            self._located is not None
+            and self._located[0] == pin
+            and math.isclose(self._located[1], lat, abs_tol=1e-5)
+            and math.isclose(self._located[2], lon, abs_tol=1e-5)
+        ):
             return
         await self._post(
             "location/update",
@@ -106,7 +126,7 @@ class FlipkartScraper(BaseScraper):
                 return parse_page(payload)
             except Exception as exc:
                 self._located = None
-                logger.error(f"Flipkart search failed: {exc}")
+                logger.error("Flipkart search failed: %s", exc)
                 return []
 
     async def close_context(self) -> None:

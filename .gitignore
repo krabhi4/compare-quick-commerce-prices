@@ -1,4 +1,7 @@
 .venv/
+venv/
+env/
+ENV/
 __pycache__/
 *.pyc
 *.pyo
@@ -8,6 +11,14 @@ frontend/node_modules/
 frontend/dist/
 data/
 *.db
-.env
+*.sqlite
+*.sqlite3
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
 .DS_Store
+.playwright/
 .playwright-mcp/

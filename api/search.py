@@ -40,6 +40,7 @@ SCRAPERS = {
 }
 
 SEARCH_CACHE: dict[str, tuple[float, SearchResponse]] = {}
+_cache_lock = asyncio.Lock()
 
 
 async def close_all_scrapers() -> None:
@@ -61,17 +62,20 @@ async def run_single_scraper(
         )
         return results
     except asyncio.TimeoutError:
-        logger.warning(f"Scraper {scraper_name} timed out after {settings.scraper_timeout_seconds}s")
+        logger.warning("Scraper %s timed out after %ss", scraper_name, settings.scraper_timeout_seconds)
         return []
     except Exception as exc:
-        logger.error(f"Scraper {scraper_name} failed: {exc}")
+        logger.error("Scraper %s failed: %s", scraper_name, exc)
         return []
 
 
 async def resolve_lat_lon(pin: str, lat: float | None, lon: float | None) -> tuple[float, float]:
     place = await geocode_pin(pin)
     if not place:
-        return (lat or settings.default_lat, lon or settings.default_lon)
+        return (
+            lat if lat is not None else settings.default_lat,
+            lon if lon is not None else settings.default_lon,
+        )
     if lat is not None and lon is not None and abs(lat - place["lat"]) < 0.5 and abs(lon - place["lon"]) < 0.5:
         return (lat, lon)
     return (place["lat"], place["lon"])
@@ -100,16 +104,18 @@ async def execute_concurrent_search(
     cache_key = f"{normalized_query}:{pin}:{lat}:{lon}:{sorted(platforms) if platforms else 'all'}"
 
     now = time.time()
-    if cache_key in SEARCH_CACHE:
-        cached_time, cached_response = SEARCH_CACHE[cache_key]
-        if now - cached_time < settings.cache_ttl_seconds:
-            return SearchResponse(
-                query=cached_response.query,
-                pin=cached_response.pin,
-                total_groups=cached_response.total_groups,
-                cached=True,
-                results=cached_response.results,
-            )
+    async with _cache_lock:
+        if cache_key in SEARCH_CACHE:
+            cached_time, cached_response = SEARCH_CACHE[cache_key]
+            if now - cached_time < settings.cache_ttl_seconds:
+                return SearchResponse(
+                    query=cached_response.query,
+                    pin=cached_response.pin,
+                    total_groups=cached_response.total_groups,
+                    cached=True,
+                    results=cached_response.results,
+                )
+            del SEARCH_CACHE[cache_key]
 
     selected_platforms = (
         [p for p in platforms if p in SCRAPERS and _is_platform_enabled(p)] if platforms else [p for p in SCRAPERS.keys() if _is_platform_enabled(p)]
@@ -129,20 +135,24 @@ async def execute_concurrent_search(
 
     grouped_results = group_products(all_products)
 
-    for group in grouped_results:
-        for product in group.platforms:
-            await save_product_and_snapshot(
-                normalized_name=group.normalized_name,
-                platform=product.platform,
-                name=product.name,
-                price=product.price,
-                pin=pin,
-                quantity=product.quantity,
-                image_url=product.image_url,
-                product_url=product.product_url,
-                mrp=product.mrp,
-                in_stock=product.in_stock,
-            )
+    save_tasks = [
+        save_product_and_snapshot(
+            normalized_name=group.normalized_name,
+            platform=product.platform,
+            name=product.name,
+            price=product.price,
+            pin=pin,
+            quantity=product.quantity,
+            image_url=product.image_url,
+            product_url=product.product_url,
+            mrp=product.mrp,
+            in_stock=product.in_stock,
+        )
+        for group in grouped_results
+        for product in group.platforms
+    ]
+    if save_tasks:
+        await asyncio.gather(*save_tasks, return_exceptions=True)
 
     response = SearchResponse(
         query=query,
@@ -152,10 +162,17 @@ async def execute_concurrent_search(
         results=grouped_results,
     )
 
-    SEARCH_CACHE[cache_key] = (now, response)
-
     serialized_results = json.dumps([g.model_dump() for g in grouped_results])
     await save_search_record(query=query, pin=pin, results_json=serialized_results)
+
+    async with _cache_lock:
+        expired = [k for k, (t, _) in SEARCH_CACHE.items() if now - t >= settings.cache_ttl_seconds]
+        for k in expired:
+            SEARCH_CACHE.pop(k, None)
+        if len(SEARCH_CACHE) > 500:
+            oldest = min(SEARCH_CACHE.keys(), key=lambda k: SEARCH_CACHE[k][0])
+            SEARCH_CACHE.pop(oldest, None)
+        SEARCH_CACHE[cache_key] = (now, response)
 
     return response
 

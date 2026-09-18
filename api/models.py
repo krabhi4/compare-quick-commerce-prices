@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1)
     pin: str = Field(default="110001")
-    lat: float | None = Field(default=None)
-    lon: float | None = Field(default=None)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
     platforms: list[str] | None = Field(default=None)
 
 
@@ -44,7 +44,7 @@ class PriceHistoryItem(BaseModel):
     product_name: str
     price: float
     mrp: float | None = None
-    in_stock: bool
+    in_stock: bool = True
     pin: str
     logged_in: bool = False
 
@@ -72,10 +72,10 @@ class TrackedProductsResponse(BaseModel):
 
 
 class AlertCreateRequest(BaseModel):
-    product_query: str
+    product_query: str = Field(..., min_length=1)
     platform: str | None = None
-    target_price: float
-    pin: str
+    target_price: float = Field(..., gt=0)
+    pin: str = Field(..., min_length=6, max_length=6)
 
 
 class AlertResponse(BaseModel):
@@ -91,14 +91,14 @@ class AlertResponse(BaseModel):
 
 class LocationUpdateRequest(BaseModel):
     pin: str | None = None
-    lat: float | None = None
-    lon: float | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
 
 
 class LocationResponse(BaseModel):
     pin: str
-    lat: float
-    lon: float
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
 
 
 class HealthResponse(BaseModel):

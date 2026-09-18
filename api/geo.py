@@ -26,7 +26,7 @@ def _save() -> None:
     try:
         CACHE_FILE.write_text(json.dumps(_cache))
     except Exception as exc:
-        logger.warning(f"geocache write failed: {exc}")
+        logger.warning("geocache write failed: %s", exc)
 
 
 def _place(address: dict) -> dict:
@@ -43,37 +43,51 @@ async def geocode_pin(pin: str) -> dict | None:
         return None
     if pin in _cache:
         return _cache[pin]
-    async with _lock:
-        if pin in _cache:
-            return _cache[pin]
-        try:
-            async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
-                r = await client.get(
-                    f"{NOMINATIM}/search",
-                    params={"postalcode": pin, "country": "India", "format": "jsonv2", "addressdetails": 1, "limit": 1},
-                )
-                hits = r.json() if r.status_code == 200 else []
-                if not hits:
-                    po = await client.get(f"https://api.postalpincode.in/pincode/{pin}")
-                    offices = (po.json()[0].get("PostOffice") or []) if po.status_code == 200 else []
-                    if offices:
-                        q = f"{offices[0].get('Name')}, {offices[0].get('District')}, {offices[0].get('State')}, India"
-                        r = await client.get(
-                            f"{NOMINATIM}/search",
-                            params={"q": q, "format": "jsonv2", "addressdetails": 1, "limit": 1},
+    try:
+        async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+            r = await client.get(
+                f"{NOMINATIM}/search",
+                params={"postalcode": pin, "country": "India", "format": "jsonv2", "addressdetails": 1, "limit": 1},
+            )
+            hits = r.json() if r.status_code == 200 else []
+            if not hits:
+                po = await client.get(f"https://api.postalpincode.in/pincode/{pin}")
+                if po.status_code == 200:
+                    try:
+                        po_data = po.json()
+                        offices = (
+                            po_data[0].get("PostOffice") or []
+                            if isinstance(po_data, list) and len(po_data) > 0 and isinstance(po_data[0], dict)
+                            else []
                         )
-                        hits = r.json() if r.status_code == 200 else []
-                if not hits:
-                    return None
-                hit = hits[0]
-                place = _place(hit.get("address", {}))
-                place.update({"lat": float(hit["lat"]), "lon": float(hit["lon"]), "postcode": pin})
+                    except Exception:
+                        offices = []
+                else:
+                    offices = []
+                if offices:
+                    q = f"{offices[0].get('Name')}, {offices[0].get('District')}, {offices[0].get('State')}, India"
+                    r = await client.get(
+                        f"{NOMINATIM}/search",
+                        params={"q": q, "format": "jsonv2", "addressdetails": 1, "limit": 1},
+                    )
+                    hits = r.json() if r.status_code == 200 else []
+            if not hits:
+                return None
+            hit = hits[0]
+            try:
+                lat_val = float(hit.get("lat"))
+                lon_val = float(hit.get("lon"))
+            except (TypeError, ValueError):
+                return None
+            place = _place(hit.get("address", {}))
+            place.update({"lat": lat_val, "lon": lon_val, "postcode": pin})
+            async with _lock:
                 _cache[pin] = place
                 _save()
-                return place
-        except Exception as exc:
-            logger.warning(f"geocode failed for {pin}: {exc}")
-            return None
+            return place
+    except Exception as exc:
+        logger.warning("geocode failed for %s: %s", pin, exc)
+        return None
 
 
 async def reverse_geocode(lat: float, lon: float) -> dict | None:
@@ -95,7 +109,7 @@ async def reverse_geocode(lat: float, lon: float) -> dict | None:
                 _save()
             return place
     except Exception as exc:
-        logger.warning(f"reverse geocode failed for {lat},{lon}: {exc}")
+        logger.warning("reverse geocode failed for %s,%s: %s", lat, lon, exc)
         return None
 
 

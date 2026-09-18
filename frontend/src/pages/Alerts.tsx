@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAlerts } from '../hooks/useAlerts'
 import { formatAmount, formatDate } from '../utils/format'
 import { PLATFORM_INFO, PLATFORM_ORDER } from '../utils/normalize'
@@ -23,20 +23,28 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({
   const [platform, setPlatform] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    setPin(currentPin)
+  }, [currentPin])
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim() || !targetPrice) return
+    const price = parseFloat(targetPrice)
+    if (!query.trim() || !Number.isFinite(price) || price <= 0) return
     setSubmitting(true)
-    const ok = await addAlert(
-      query.trim(),
-      parseFloat(targetPrice),
-      pin.trim() || currentPin,
-      platform || undefined
-    )
-    setSubmitting(false)
-    if (ok) {
-      setQuery('')
-      setTargetPrice('')
+    try {
+      const ok = await addAlert(
+        query.trim(),
+        price,
+        pin.trim() || currentPin,
+        platform || undefined
+      )
+      if (ok) {
+        setQuery('')
+        setTargetPrice('')
+      }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -154,8 +162,9 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({
 
                 <button
                   type="button"
+                  disabled={submitting}
                   onClick={() => removeAlert(alert.id)}
-                  className="tag shrink-0 text-ink-3 transition-colors hover:text-mark"
+                  className="tag shrink-0 text-ink-3 transition-colors hover:text-mark disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   stop
                 </button>
