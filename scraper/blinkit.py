@@ -47,7 +47,7 @@ def parse_snippets(snippets: list[dict]) -> list[PlatformProduct]:
                 mrp=_safe_float(item.get("mrp")),
                 quantity=item.get("unit") or _text(data.get("variant")),
                 in_stock=inventory > 0 and not data.get("is_sold_out", False),
-                product_url=f"https://blinkit.com/prn/{product_id}" if product_id else None,
+                product_url=f"https://blinkit.com/prn/{product_id}" if product_id is not None else None,
                 image_url=item.get("image_url") or (data.get("image") or {}).get("url"),
                 eta=_text((data.get("eta_tag") or {}).get("title")),
             )

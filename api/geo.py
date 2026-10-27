@@ -24,6 +24,7 @@ _cache: dict = _load()
 
 def _save() -> None:
     try:
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         CACHE_FILE.write_text(json.dumps(_cache))
     except Exception as exc:
         logger.warning("geocache write failed: %s", exc)

@@ -143,6 +143,7 @@ async def execute_concurrent_search(
             price=product.price,
             pin=pin,
             quantity=product.quantity,
+            brand=group.brand,
             image_url=product.image_url,
             product_url=product.product_url,
             mrp=product.mrp,

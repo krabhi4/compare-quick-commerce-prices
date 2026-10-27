@@ -81,7 +81,7 @@ async def save_product_and_snapshot(
                         if product_url is not None:
                             product.product_url = product_url
                         product.in_stock = in_stock
-                        product.updated_at = datetime.datetime.utcnow()
+                        product.updated_at = datetime.datetime.now(datetime.timezone.utc)
 
                     snapshot = PriceSnapshot(
                         product_id=product.id,
@@ -212,6 +212,6 @@ async def update_alert_check_time(alert_id: int) -> None:
                     result = await session.execute(stmt)
                     alert = result.scalars().first()
                     if alert:
-                        alert.last_checked = datetime.datetime.utcnow()
+                        alert.last_checked = datetime.datetime.now(datetime.timezone.utc)
         except Exception as exc:
             logger.error("Failed to update alert check time: %s", exc)

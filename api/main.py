@@ -79,6 +79,7 @@ current_location = load_persisted_location()
 
 async def persist_location() -> None:
     try:
+        location_file.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(location_file.write_text, json.dumps(current_location))
     except Exception as exc:
         logger.warning("Failed to persist location: %s", exc)
@@ -121,9 +122,10 @@ async def get_location() -> LocationResponse:
 
 
 frontend_dist_dir = Path("frontend/dist")
-if frontend_dist_dir.exists():
+if (frontend_dist_dir / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=str(frontend_dist_dir / "assets")), name="assets")
 
+if frontend_dist_dir.is_dir():
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         base_dir = frontend_dist_dir.resolve()
