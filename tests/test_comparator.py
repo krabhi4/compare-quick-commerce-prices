@@ -15,7 +15,7 @@ from api.matching import (
 from api.geo import geocode_pin
 from scraper.blinkit import parse_snippets
 from scraper.zepto import parse_items, grid_items
-from scraper.instamart import parse_search
+from scraper.instamart import parse_search, InstamartScraper
 from scraper.flipkart import parse_page
 from scraper.bigbasket import parse_products
 from db.repository import (
@@ -276,6 +276,21 @@ class TestGeo(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await geocode_pin("invalid"))
         self.assertIsNone(await geocode_pin("123"))
         self.assertIsNone(await geocode_pin(""))
+
+
+class TestScraperLocking(unittest.IsolatedAsyncioTestCase):
+    async def test_get_context_inside_search_lock_does_not_deadlock(self):
+        class FakeContext:
+            pages = [object()]
+
+            def is_closed(self):
+                return False
+
+        scraper = InstamartScraper()
+        scraper._context = FakeContext()
+        async with scraper.lock:
+            context = await asyncio.wait_for(scraper.get_context(), timeout=1)
+        self.assertIs(context, scraper._context)
 
 
 class TestDatabaseRepository(unittest.IsolatedAsyncioTestCase):
