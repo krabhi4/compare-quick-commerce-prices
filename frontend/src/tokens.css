@@ -1,0 +1,60 @@
+@theme static {
+  --color-*: initial;
+  --color-paper: oklch(95.5% 0.014 85); --color-paper-2: oklch(92% 0.022 84); --color-paper-3: oklch(85% 0.032 80);
+  --color-ink: oklch(21% 0.012 60); --color-ink-2: oklch(31% 0.012 60); --color-muted: oklch(46% 0.014 62);
+  --color-rule: oklch(83% 0.022 84); --color-rule-ink: oklch(21% 0.012 60);
+  --color-accent: oklch(34% 0.115 267); --color-accent-2: oklch(43% 0.125 267); --color-accent-ink: oklch(95.5% 0.014 85); --color-focus: oklch(43% 0.15 267);
+  --color-error: oklch(52% 0.19 27); --color-success: oklch(50% 0.12 150);
+  --color-series-1: oklch(34% 0.115 267); --color-series-2: oklch(45% 0.115 267); --color-series-3: oklch(55% 0.115 267); --color-series-4: oklch(63% 0.1 267); --color-series-5: oklch(46% 0.014 62);
+  --color-plate: oklch(98% 0.005 85);
+  --color-transparent: transparent; --color-current: currentColor;
+  --font-display: "Libre Caslon Display", "Libre Caslon Text", ui-serif, Georgia, serif;
+  --font-body: "Hanken Grotesk Variable", "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: "DM Mono", ui-monospace, monospace;
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.44rem; --text-2xl: 1.728rem; --text-3xl: 2.074rem;
+  --text-display-s: 1.44rem; --text-display: 1.728rem; --text-section: 1.2rem; --text-title: 1rem; --text-lead: 1rem;
+  --tracking-display: -0.01em;
+  --radius-card: 0; --radius-pill: 0;
+  --shadow-card: none;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+:root {
+  color-scheme: light dark;
+  --weight-body: 400;
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  --container: 1440px; --gutter: 64px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
+  --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+  --rule-hair: 1px; --rule-ink: 2px;
+  --display-weight: 400;
+}
+
+@media (max-width: 60rem) { :root { --gutter: 24px; --section-gap-s: 80px; --section-gap: 96px; --section-gap-l: 120px; } }
+@media (max-width: 40rem) { :root { --gutter: 16px; --section-gap-s: 56px; --section-gap: 72px; --section-gap-l: 96px; --gap-columns: 16px; } }
+
+[data-mode="light"] { color-scheme: light; }
+
+[data-mode="dark"] {
+  --color-paper: oklch(16% 0.012 85); --color-paper-2: oklch(19.5% 0.014 84); --color-paper-3: oklch(25.5% 0.02 80);
+  --color-ink: oklch(93% 0.012 60); --color-ink-2: oklch(84% 0.012 60); --color-muted: oklch(72% 0.014 62);
+  --color-rule: oklch(33% 0.018 84); --color-rule-ink: oklch(84% 0.012 60);
+  --color-accent: oklch(76% 0.085 267); --color-accent-2: oklch(82% 0.075 267); --color-accent-ink: oklch(18% 0.03 267); --color-focus: oklch(74% 0.14 267);
+  --color-error: oklch(72% 0.15 27); --color-success: oklch(74% 0.12 150);
+  --color-series-1: oklch(78% 0.09 267); --color-series-2: oklch(66% 0.1 267); --color-series-3: oklch(56% 0.1 267); --color-series-4: oklch(48% 0.09 267); --color-series-5: oklch(72% 0.014 62);
+  --weight-body: 350;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode]) {
+    --color-paper: oklch(16% 0.012 85); --color-paper-2: oklch(19.5% 0.014 84); --color-paper-3: oklch(25.5% 0.02 80);
+    --color-ink: oklch(93% 0.012 60); --color-ink-2: oklch(84% 0.012 60); --color-muted: oklch(72% 0.014 62);
+    --color-rule: oklch(33% 0.018 84); --color-rule-ink: oklch(84% 0.012 60);
+    --color-accent: oklch(76% 0.085 267); --color-accent-2: oklch(82% 0.075 267); --color-accent-ink: oklch(18% 0.03 267); --color-focus: oklch(74% 0.14 267);
+    --color-error: oklch(72% 0.15 27); --color-success: oklch(74% 0.12 150);
+    --color-series-1: oklch(78% 0.09 267); --color-series-2: oklch(66% 0.1 267); --color-series-3: oklch(56% 0.1 267); --color-series-4: oklch(48% 0.09 267); --color-series-5: oklch(72% 0.014 62);
+    --weight-body: 350;
+    color-scheme: dark;
+  }
+}

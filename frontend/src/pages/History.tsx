@@ -54,70 +54,83 @@ export const HistoryPage: React.FC = () => {
   const unique = Array.from(new Map(matched.map((p) => [p.normalized_name, p])).values())
 
   return (
-    <section className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b-2 border-ink pb-2">
-        <div className="max-w-prose">
-          <h2 className="board text-lead [font-stretch:88%] font-semibold">Tracked items</h2>
-        </div>
-        <label className="flex items-baseline gap-2">
-          <span className="tag text-ink-2">filter</span>
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        <h2>Tracked items</h2>
+        <label className="flex flex-col gap-1.5">
+          <span className="label">Filter</span>
           <input
             type="search"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="brand or item"
-            className="board w-40 border-b border-rule-strong bg-transparent pb-0.5 text-label [font-stretch:96%] outline-none focus:border-ink"
+            className="field w-60"
           />
         </label>
       </div>
 
-      {error && <p className="tag text-mark">{error}</p>}
+      {error && <p className="text-error">{error}</p>}
 
       {loading ? (
-        <p className="tag text-ink-3">reading snapshots…</p>
+        <div aria-busy="true" className="flex flex-col gap-4">
+          <p className="label">Reading snapshots…</p>
+          <div className="flex flex-col border-t-2 border-rule-ink">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3 border-b border-rule py-4">
+              <span className="size-12 shrink-0 bg-paper-2" />
+              <span className="h-4 w-56 max-w-full bg-paper-2" />
+            </div>
+          ))}
+          </div>
+        </div>
       ) : unique.length === 0 ? (
-        <p className="text-label text-ink-2">
+        <p className="border-t-2 border-rule-ink pt-4 text-muted">
           {products.length === 0
             ? 'Nothing is tracked yet. Each search records the prices it reads.'
             : `No tracked item matches ${filter}.`}
         </p>
       ) : (
-        <ul className="flex flex-col">
-          {unique.map((product, i) => {
+        <ul className="m-0 flex list-none flex-col border-t-2 border-rule-ink p-0">
+          {unique.map((product) => {
             const isOpen = open === product.normalized_name
             return (
-              <li key={product.normalized_name} className="border-t border-rule last:border-b">
+              <li key={product.normalized_name} className="border-b border-rule">
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? null : product.normalized_name)}
                   aria-expanded={isOpen}
-                  className="rise flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-panel"
-                  style={{ animationDelay: `${Math.min(i, 12) * 24}ms` }}
+                  className="group flex w-full items-center gap-4 py-4 text-left"
                 >
                   {product.image_url ? (
                     <img
                       src={product.image_url}
                       alt=""
+                      width={48}
+                      height={48}
                       loading="lazy"
-                      className="size-10 shrink-0 bg-panel object-contain"
+                      className="size-12 shrink-0 bg-plate object-contain p-0.5"
                     />
                   ) : (
-                    <span className="size-10 shrink-0 bg-sunk" />
+                    <span className="size-12 shrink-0 bg-paper-2" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="board block truncate text-body [font-stretch:92%] font-semibold">
-                      {product.normalized_name}
-                    </span>
-                    <span className="mt-0.5 block text-micro text-ink-2">
-                      {[product.brand, product.quantity].filter(Boolean).join(' · ')}
-                      {product.brand || product.quantity ? ' · ' : ''}
-                      updated {product.updated_at ? formatDate(product.updated_at) : 'unknown'}
+                    <span className="line-clamp-2 font-medium">{product.normalized_name}</span>
+                    <span className="mt-0.5 block text-sm text-muted">
+                      {[
+                        product.brand,
+                        product.quantity,
+                        `updated ${product.updated_at ? formatDate(product.updated_at) : 'unknown'}`,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
                     </span>
                   </span>
-                  <span className="tag shrink-0 text-ink-3">{isOpen ? 'close' : 'trend'}</span>
+                  <span className="shrink-0 text-sm font-medium text-ink-2 underline decoration-muted decoration-1 underline-offset-4 transition-colors group-hover:decoration-accent">
+                    {isOpen ? 'Close' : 'Trend'}
+                  </span>
                 </button>
                 {isOpen && (
-                  <div className="border-t border-dashed border-rule-strong bg-panel px-1">
+                  <div className="bg-paper-2 px-4">
                     <PriceChart productName={product.normalized_name} />
                   </div>
                 )}

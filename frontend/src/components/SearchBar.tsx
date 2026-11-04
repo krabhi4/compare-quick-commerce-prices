@@ -43,35 +43,38 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <form onSubmit={submit} className="flex items-stretch gap-0 border-b-2 border-ink">
-        <label htmlFor="q" className="sr-only">
-          Grocery item
-        </label>
-        <input
-          id="q"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="milk, atta, eggs, amul butter"
-          disabled={loading}
-          autoComplete="off"
-          className="board min-w-0 flex-1 bg-transparent py-2 text-lead [font-stretch:96%] outline-none disabled:text-ink-3"
-        />
+    <div className="flex max-w-3xl flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
+        <div className="flex min-w-0 flex-1 basis-72 flex-col gap-1.5">
+          <label htmlFor="q" className="label">
+            Grocery item
+          </label>
+          <input
+            id="q"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="milk, atta, eggs, amul butter"
+            disabled={loading}
+            autoComplete="off"
+            className="field w-full"
+          />
+        </div>
         <button
           type="submit"
-          disabled={loading || !query.trim()}
-          className="tag self-stretch bg-ink px-4 text-ground transition-colors hover:bg-mark disabled:bg-transparent disabled:text-ink-3"
+          disabled={loading}
+          aria-busy={loading}
+          className="btn min-w-32"
         >
-          {loading ? 'reading' : 'read prices'}
+          {loading ? 'Reading…' : 'Read prices'}
         </button>
       </form>
 
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {editingPin ? (
-          <span className="flex items-baseline gap-2">
-            <label htmlFor="pin" className="tag text-ink-2">
-              pincode
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <label htmlFor="pin" className="label">
+              Pincode
             </label>
             <input
               id="pin"
@@ -80,15 +83,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               onKeyDown={(e) => e.key === 'Enter' && savePin()}
-              className="board w-20 border-b border-ink bg-transparent text-label tracking-[0.15em] outline-none"
+              className="field w-28 tabular-nums"
             />
             <button
               type="button"
               onClick={savePin}
               disabled={pin.length !== 6}
-              className="tag text-mark disabled:text-ink-3 disabled:cursor-not-allowed"
+              className="link"
             >
-              set
+              Set
             </button>
             <button
               type="button"
@@ -96,32 +99,30 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 setPin(currentPin)
                 setEditingPin(false)
               }}
-              className="tag text-ink-3 hover:text-ink"
+              className="link"
             >
-              cancel
+              Cancel
             </button>
             <button
               type="button"
               onClick={onDetectLocation}
               disabled={detectingLocation}
-              className="tag text-ink-3 hover:text-ink"
+              className="link"
             >
-              {detectingLocation ? 'locating…' : 'use my location'}
+              {detectingLocation ? 'Locating…' : 'Use my location'}
             </button>
           </span>
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditingPin(true)}
-            className="tag text-ink-2 hover:text-mark"
-          >
-            pincode{' '}
-            <span className="board text-label tracking-[0.15em] text-ink">{currentPin}</span>
-            <span className="ml-1.5 text-ink-3">change</span>
-          </button>
+          <span className="flex items-center gap-3">
+            <span className="label">Pincode</span>
+            <span className="font-medium tabular-nums text-ink">{currentPin}</span>
+            <button type="button" onClick={() => setEditingPin(true)} className="link">
+              Change
+            </button>
+          </span>
         )}
 
-        {locationError && <span className="text-micro text-mark">{locationError}</span>}
+        {locationError && <span className="text-sm text-error">{locationError}</span>}
       </div>
     </div>
   )

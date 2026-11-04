@@ -13,30 +13,29 @@ import { useHistory, type PriceHistoryItem } from '../hooks/useHistory'
 import { formatPrice, formatAmount, formatDate } from '../utils/format'
 import { PLATFORM_INFO, PLATFORM_ORDER } from '../utils/normalize'
 
-const DASHES = ['0', '5 3', '1 3', '9 3 2 3', '6 2 1 2']
+const DASHES = ['0', '6 3', '2 3', '9 3 2 3', '4 2']
+const SERIES = [1, 2, 3, 4, 5].map((n) => `var(--color-series-${n})`)
 
-const INK = 'oklch(24% 0.022 255)'
-const INK_2 = 'oklch(46% 0.018 255)'
-const INK_3 = 'oklch(64% 0.014 255)'
-const RULE = 'oklch(87% 0.010 150)'
-const PANEL = 'oklch(97.8% 0.005 150)'
+const INK = 'var(--color-ink)'
+const MUTED = 'var(--color-muted)'
+const RULE = 'var(--color-rule)'
+const PAPER = 'var(--color-paper)'
+const TICK = { fontSize: 12, fill: MUTED, fontFamily: 'var(--font-outlier)' }
 
 export const PriceChart: React.FC<{ productName: string }> = ({ productName }) => {
   const { history, loading, error } = useHistory(productName)
 
   if (loading) {
-    return <p className="tag px-1 py-6 text-ink-3">reading snapshots…</p>
+    return <p className="label py-6">Reading snapshots…</p>
   }
 
   if (error) {
-    return <p className="tag px-1 py-6 text-mark">{error}</p>
+    return <p className="py-6 text-error">{error}</p>
   }
 
   const safeHistory = Array.isArray(history) ? history : []
   if (safeHistory.length === 0) {
-    return (
-      <p className="px-1 py-6 text-label text-ink-2">This item has no snapshots yet.</p>
-    )
+    return <p className="py-6 text-muted">This item has no snapshots yet.</p>
   }
 
   const rows: Record<string, Record<string, number | string>> = {}
@@ -51,39 +50,42 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
   const prices = safeHistory.map((h) => h.price).filter((p) => Number.isFinite(p))
 
   const stats: [string, number][] = [
-    ['low', prices.reduce((a, c) => Math.min(a, c), prices[0] ?? 0)],
-    ['mean', prices.length > 0 ? Math.round(prices.reduce((a, c) => a + c, 0) / prices.length) : 0],
-    ['high', prices.reduce((a, c) => Math.max(a, c), prices[0] ?? 0)],
+    ['Low', prices.reduce((a, c) => Math.min(a, c), prices[0] ?? 0)],
+    ['Mean', prices.length > 0 ? Math.round(prices.reduce((a, c) => a + c, 0) / prices.length) : 0],
+    ['High', prices.reduce((a, c) => Math.max(a, c), prices[0] ?? 0)],
   ]
 
   return (
-    <div className="flex flex-col gap-4 py-4">
+    <div className="flex flex-col gap-4 py-5">
       <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
         {stats.map(([label, value], i) => (
           <span key={label} className="flex items-baseline gap-2">
-            <span className="tag text-ink-3">{label}</span>
-            <span className={`rate text-lead ${i === 0 ? 'text-mark' : 'text-ink'}`}>
+            <span className="label">{label}</span>
+            <span className={`figure text-lg text-ink ${i === 0 ? 'font-medium' : ''}`}>
               {formatAmount(value)}
             </span>
           </span>
         ))}
-        <span className="tag ml-auto text-ink-3">{history.length} snapshots</span>
+        <span className="ml-auto text-sm text-muted">
+          {history.length} {history.length === 1 ? 'snapshot' : 'snapshots'}
+        </span>
       </div>
 
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
+          <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
             <CartesianGrid stroke={RULE} vertical={false} />
             <XAxis
               dataKey="time"
-              stroke={INK_3}
-              tick={{ fontSize: 11, fill: INK_2 }}
+              stroke={MUTED}
+              tick={TICK}
               tickLine={false}
-              axisLine={{ stroke: INK }}
+              axisLine={{ stroke: RULE }}
+              padding={{ left: 56, right: 56 }}
             />
             <YAxis
-              stroke={INK_3}
-              tick={{ fontSize: 11, fill: INK_2 }}
+              stroke={MUTED}
+              tick={TICK}
               tickFormatter={(v) => `${v}`}
               tickLine={false}
               axisLine={false}
@@ -91,10 +93,11 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
             />
             <Tooltip
               contentStyle={{
-                background: PANEL,
+                background: PAPER,
                 border: `1px solid ${INK}`,
                 borderRadius: 0,
-                fontSize: 12,
+                fontSize: 14,
+                fontFamily: 'var(--font-body)',
                 color: INK,
               }}
               formatter={(value: unknown) => {
@@ -103,8 +106,9 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
               }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 11, paddingTop: 8, color: INK_2 }}
+              wrapperStyle={{ fontSize: 14, paddingTop: 8 }}
               iconType="plainline"
+              formatter={(value) => <span style={{ color: INK }}>{value}</span>}
             />
             {seen.map((platform, i) => (
               <Line
@@ -112,11 +116,11 @@ export const PriceChart: React.FC<{ productName: string }> = ({ productName }) =
                 type="linear"
                 dataKey={platform}
                 name={PLATFORM_INFO[platform]?.name ?? platform}
-                stroke={i === 0 ? INK : INK_2}
-                strokeWidth={i === 0 ? 2 : 1.5}
+                stroke={SERIES[i % SERIES.length]}
+                strokeWidth={2}
                 strokeDasharray={DASHES[i % DASHES.length]}
                 dot={false}
-                activeDot={{ r: 3, fill: 'oklch(52% 0.19 32)', stroke: 'none' }}
+                activeDot={{ r: 3, fill: INK, stroke: 'none' }}
               />
             ))}
           </LineChart>

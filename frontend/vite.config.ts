@@ -14,8 +14,8 @@ export default defineConfig({
         short_name: 'QuickCompare',
         description:
           'Live prices from Blinkit, Zepto, Instamart, Flipkart Minutes and BigBasket Now, side by side for one pincode.',
-        theme_color: '#edf0ec',
-        background_color: '#edf0ec',
+        theme_color: '#f4f0e6',
+        background_color: '#f4f0e6',
         display: 'standalone',
         start_url: '/',
         icons: [
