@@ -5,11 +5,11 @@ export interface PlatformMeta {
 }
 
 export const PLATFORM_INFO: Record<string, PlatformMeta> = {
-  blinkit: { id: 'blinkit', name: 'Blinkit', short: 'BLNK' },
-  zepto: { id: 'zepto', name: 'Zepto', short: 'ZEPT' },
-  instamart: { id: 'instamart', name: 'Instamart', short: 'INST' },
-  flipkart: { id: 'flipkart', name: 'Flipkart Minutes', short: 'FLPK' },
-  bigbasket: { id: 'bigbasket', name: 'BigBasket Now', short: 'BGBK' },
+  blinkit: { id: 'blinkit', name: 'Blinkit', short: 'Blinkit' },
+  zepto: { id: 'zepto', name: 'Zepto', short: 'Zepto' },
+  instamart: { id: 'instamart', name: 'Instamart', short: 'Instamart' },
+  flipkart: { id: 'flipkart', name: 'Flipkart Minutes', short: 'Flipkart' },
+  bigbasket: { id: 'bigbasket', name: 'BigBasket Now', short: 'BigBasket' },
 }
 
 export const PLATFORM_ORDER: readonly string[] = [

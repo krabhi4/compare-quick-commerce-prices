@@ -8,32 +8,29 @@ interface HomePageProps {
 const STARTERS = ['milk', 'atta', 'eggs', 'amul butter', 'curd', 'brown bread', 'onion', 'maggi']
 
 export const HomePage: React.FC<HomePageProps> = ({ onQuickSearch }) => (
-  <section className="flex flex-col gap-8">
-    <div className="grid grid-cols-2 gap-x-6 border-y-2 border-ink py-2 sm:grid-cols-3 lg:grid-cols-5">
-      {PLATFORM_ORDER.map((key) => (
-        <div key={key} className="flex items-baseline gap-2">
-          <p className="tag text-mark">{PLATFORM_INFO[key]?.short ?? key}</p>
-          <p className="board text-micro [font-stretch:88%] text-ink-2">
-            {PLATFORM_INFO[key]?.name ?? key}
-          </p>
-        </div>
-      ))}
+  <dl className="grid border-t-2 border-rule-ink">
+    <div className="grid gap-x-8 gap-y-2 border-b border-rule py-4 md:grid-cols-[10rem_minmax(0,1fr)]">
+      <dt className="label pt-1">Stores read</dt>
+      <dd className="m-0 flex flex-wrap gap-x-6 gap-y-1 text-lg text-ink-2">
+        {PLATFORM_ORDER.map((key) => (
+          <span key={key}>{PLATFORM_INFO[key]?.name ?? key}</span>
+        ))}
+      </dd>
     </div>
-
-    <div>
-      <p className="tag border-b border-rule pb-1.5 text-ink-2">start with</p>
-      <div className="flex flex-wrap gap-x-5 gap-y-2 pt-2.5">
+    <div className="grid gap-x-8 gap-y-2 border-b border-rule py-4 md:grid-cols-[10rem_minmax(0,1fr)]">
+      <dt className="label pt-2">Start with</dt>
+      <dd className="m-0 flex flex-wrap gap-x-6 gap-y-1">
         {STARTERS.map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => onQuickSearch(item)}
-            className="board text-body [font-stretch:92%] text-ink underline decoration-rule-strong decoration-1 underline-offset-4 transition-colors hover:text-mark hover:decoration-mark"
+            className="link min-h-10 text-lg"
           >
             {item}
           </button>
         ))}
-      </div>
+      </dd>
     </div>
-  </section>
+  </dl>
 )

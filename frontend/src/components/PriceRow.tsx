@@ -21,39 +21,39 @@ function Cell({
   cheapest: boolean
 }) {
   const label = (
-    <span className="tag text-ink-3 md:hidden">{PLATFORM_INFO[platform]?.short ?? platform}</span>
+    <span className="text-sm font-medium text-muted lg:hidden">
+      {PLATFORM_INFO[platform]?.short ?? platform}
+    </span>
   )
 
   if (!entry) {
     return (
-      <div className="flex flex-col items-end gap-2 px-2 py-3">
-        {label}
-        <span className="my-auto h-px w-4 bg-rule-strong" title="does not deliver here" />
+      <div className="hidden flex-col items-end gap-2 px-3 py-4 lg:flex">
+        <span className="my-auto h-px w-4 bg-muted" title="does not deliver here" />
+        <span className="sr-only">Not listed</span>
       </div>
     )
   }
 
+  const figure = !entry.in_stock
+    ? 'figure text-lg text-muted line-through decoration-muted decoration-1'
+    : `figure decoration-accent decoration-2 underline-offset-4 group-hover:underline ${
+        cheapest ? 'text-3xl font-medium text-ink' : 'text-lg text-ink-2'
+      }`
+
   const body = (
     <>
       {label}
-      <span
-        className={
-          cheapest
-            ? 'rate text-rate text-ink'
-            : 'rate text-lead text-ink-2 [font-stretch:100%] [font-weight:500]'
-        }
-      >
+      <span className={figure}>
         {formatAmount(entry.price)}
       </span>
-      <span className="tag text-ink-3">
-        {!entry.in_stock ? 'out' : formatEta(entry.eta) || ' '}
+      <span className="text-sm text-muted">
+        {!entry.in_stock ? 'Out' : formatEta(entry.eta) || ' '}
       </span>
     </>
   )
 
-  const shell = `flex flex-col items-end gap-1.5 px-2 py-3 ${cheapest ? 'bg-mark-wash' : ''} ${
-    !entry.in_stock ? 'opacity-45' : ''
-  }`
+  const shell = `group flex min-w-20 flex-col items-start gap-1.5 px-3 py-4 lg:items-end ${cheapest ? 'bg-paper-3' : ''}`
 
   const isSafeUrl =
     entry.product_url && /^https?:\/\//i.test(entry.product_url)
@@ -68,7 +68,7 @@ function Cell({
       target="_blank"
       rel="noopener noreferrer"
       title={`Open on ${PLATFORM_INFO[platform]?.name ?? platform}`}
-      className={`${shell} transition-colors hover:bg-sunk`}
+      className={shell}
     >
       {body}
     </a>
@@ -85,45 +85,49 @@ export const PriceRow: React.FC<PriceRowProps> = ({
   const byPlatform = new Map(product.platforms.map((p) => [p.platform.toLowerCase(), p]))
   const { savings, savingsPercent } = calculateSavings(product.platforms.map((p) => p.price))
   const image = product.platforms.find((p) => p.image_url)?.image_url
+  const missing = PLATFORM_ORDER.filter((key) => !byPlatform.has(key)).map(
+    (key) => PLATFORM_INFO[key]?.short ?? key
+  )
 
   return (
-    <div
-      className="rise col-span-full grid grid-cols-subgrid border-t border-rule"
-      style={{ animationDelay: `${Math.min(index, 12) * 24}ms` }}
-    >
-      <div className="col-span-full flex items-start gap-3 pt-3 pr-4 md:col-span-1 md:py-3">
+    <div className="col-span-full flex flex-wrap border-t border-rule lg:grid lg:grid-cols-subgrid">
+      <div className="flex w-full items-start gap-3 pt-4 pr-4 lg:w-auto lg:py-4">
         {image ? (
           <img
             src={image}
             alt=""
-            loading="lazy"
-            className="mt-0.5 size-10 shrink-0 bg-panel object-contain"
+            width={48}
+            height={48}
+            loading={index === 0 ? 'eager' : 'lazy'}
+            fetchPriority={index === 0 ? 'high' : undefined}
+            className="size-12 shrink-0 bg-plate object-contain p-0.5"
           />
         ) : (
-          <span className="mt-0.5 size-10 shrink-0 bg-sunk" />
+          <span className="size-12 shrink-0 bg-paper-2" />
         )}
         <div className="min-w-0">
-          <h3 className="board line-clamp-2 text-body leading-snug font-semibold [font-stretch:92%]">
-            {product.normalized_name}
-          </h3>
-          <p className="mt-0.5 truncate text-micro text-ink-2">
-            {[product.brand, product.quantity].filter(Boolean).join(' · ') || ' '}
+          <h3 className="line-clamp-3">{product.normalized_name}</h3>
+          <p className="mt-0.5 truncate text-sm text-muted">
+            {[product.brand, product.quantity].filter(Boolean).join(', ') || ' '}
           </p>
-          <div className="mt-1.5 flex gap-3">
+          {missing.length > 0 && (
+            <p className="mt-0.5 text-sm text-muted lg:hidden">Not on {missing.join(', ')}</p>
+          )}
+          <div className="mt-1 flex gap-4">
             <button
               type="button"
               onClick={onToggleHistory}
               aria-expanded={expanded}
-              className="tag text-ink-3 underline decoration-rule-strong decoration-1 underline-offset-3 transition-colors hover:text-mark hover:decoration-mark"
+              className="link"
             >
-              {expanded ? 'hide trend' : 'trend'}
+              {expanded ? 'Hide trend' : 'Trend'}
             </button>
             <button
               type="button"
               onClick={() => onSetAlert(product.normalized_name, product.cheapest_price)}
-              className="tag text-ink-3 underline decoration-rule-strong decoration-1 underline-offset-3 transition-colors hover:text-mark hover:decoration-mark"
+              className="link"
             >
-              alert
+              Alert
             </button>
           </div>
         </div>
@@ -138,15 +142,15 @@ export const PriceRow: React.FC<PriceRowProps> = ({
         />
       ))}
 
-      <div className="flex flex-col items-end gap-1.5 py-3 pl-2">
-        <span className="tag text-ink-3 md:hidden">save</span>
+      <div className="flex min-w-20 flex-col items-start gap-1.5 px-3 py-4 lg:items-end lg:pr-0">
+        <span className="text-sm font-medium text-muted lg:hidden">Save</span>
         {savings > 0 ? (
           <>
-            <span className="rate text-lead text-mark">{formatAmount(savings)}</span>
-            <span className="tag text-ink-3">{savingsPercent}%</span>
+            <span className="figure text-lg font-medium text-ink">{formatAmount(savings)}</span>
+            <span className="text-sm text-muted">{savingsPercent}%</span>
           </>
         ) : (
-          <span className="tag text-ink-3">same</span>
+          <span className="text-sm text-muted">Same</span>
         )}
       </div>
     </div>

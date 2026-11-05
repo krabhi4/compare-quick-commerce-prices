@@ -10,23 +10,25 @@ import { HomePage } from './pages/Home'
 type ActiveTab = 'board' | 'trends' | 'alerts'
 
 const TABS: { id: ActiveTab; label: string }[] = [
-  { id: 'board', label: 'board' },
-  { id: 'trends', label: 'trends' },
-  { id: 'alerts', label: 'alerts' },
+  { id: 'board', label: 'Board' },
+  { id: 'trends', label: 'Trends' },
+  { id: 'alerts', label: 'Alerts' },
 ]
 
-const Mark = () => (
-  <svg viewBox="0 0 32 32" aria-hidden className="size-6 shrink-0">
-    <rect x="4" y="20" width="4" height="8" fill="var(--color-mark)" />
-    <rect x="10" y="12" width="4" height="16" fill="currentColor" />
-    <rect x="16" y="15" width="4" height="13" fill="currentColor" />
-    <rect x="22" y="7" width="4" height="21" fill="currentColor" />
-    <rect x="4" y="4" width="22" height="2" fill="var(--color-mark)" />
-  </svg>
-)
+type Mode = 'system' | 'light' | 'dark'
+
+const readMode = (): Mode => {
+  try {
+    const saved = localStorage.getItem('mode')
+    return saved === 'light' || saved === 'dark' ? saved : 'system'
+  } catch {
+    return 'system'
+  }
+}
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('board')
+  const [mode, setMode] = useState<Mode>(readMode)
   const [alertPreset, setAlertPreset] = useState<{ query: string; price: number } | null>(null)
 
   const { results, loading, error, isCached, lastQuery, executeSearch } = useSearch()
@@ -50,6 +52,18 @@ export const App: React.FC = () => {
     else document.title = base
   }, [activeTab, loading, lastQuery, location?.pin])
 
+  useEffect(() => {
+    const root = document.documentElement
+    if (mode === 'system') delete root.dataset.mode
+    else root.dataset.mode = mode
+    try {
+      if (mode === 'system') localStorage.removeItem('mode')
+      else localStorage.setItem('mode', mode)
+    } catch {
+      return
+    }
+  }, [mode])
+
   const handleSearch = (query: string, pin: string) => {
     setActiveTab('board')
     executeSearch(query, pin, [], location.lat, location.lon)
@@ -60,42 +74,56 @@ export const App: React.FC = () => {
     setActiveTab('alerts')
   }
 
-  return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b-2 border-ink pt-6 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('board')}
-          className="flex items-end gap-2.5 text-ink"
-        >
-          <Mark />
-          <span className="board text-lead [font-stretch:80%] font-extrabold uppercase tracking-[0.02em] leading-none">
-            QuickCompare
-          </span>
-        </button>
+  const showBoard = results.length > 0 || loading || Boolean(lastQuery) || Boolean(error)
 
-        <nav className="flex items-baseline gap-5">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-              className={`tag transition-colors ${
-                activeTab === tab.id
-                  ? 'text-mark underline decoration-mark decoration-2 underline-offset-6'
-                  : 'text-ink-3 hover:text-ink'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b-2 border-rule-ink">
+        <div className="mx-auto flex w-full max-w-(--container) flex-wrap items-end justify-between gap-x-8 gap-y-1 px-(--gutter) pt-5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('board')}
+            className="wordmark pb-3 transition-colors hover:text-accent"
+          >
+            QuickCompare
+          </button>
+
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
+            <nav aria-label="Screens" className="flex items-end gap-6">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  aria-current={activeTab === tab.id ? 'page' : undefined}
+                  className="tab"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            <label className="mb-1.5 flex items-center gap-2">
+              <span className="label">Theme</span>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as Mode)}
+                className="field min-h-8 text-sm"
+              >
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+          </div>
+        </div>
       </header>
 
-      <main className="flex flex-1 flex-col gap-6 py-6 pb-16">
+      <main className="mx-auto flex w-full max-w-(--container) flex-1 flex-col gap-10 px-(--gutter) pt-10 pb-24">
         {activeTab === 'board' && (
           <>
+            {!showBoard && <h2>Live grocery prices for one pincode</h2>}
+
             <SearchBar
               onSearch={handleSearch}
               loading={loading}
@@ -106,7 +134,7 @@ export const App: React.FC = () => {
               locationError={locationError}
             />
 
-            {results.length > 0 || loading || lastQuery || error ? (
+            {showBoard ? (
               <ResultsPage
                 results={results}
                 loading={loading}

@@ -15,6 +15,7 @@ class BaseScraper(ABC):
         self.profile_dir = settings.data_dir / "profiles" / platform_name
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         self.lock = asyncio.Lock()
+        self._context_lock = asyncio.Lock()
         self._playwright: Playwright | None = None
         self._context: BrowserContext | None = None
 
@@ -36,7 +37,7 @@ class BaseScraper(ABC):
                 self._playwright = None
 
     async def get_context(self, headless: bool = True) -> BrowserContext:
-        async with self.lock:
+        async with self._context_lock:
             if self._context is not None:
                 try:
                     if len(self._context.pages) > 0 or not self._context.is_closed():
@@ -79,7 +80,7 @@ class BaseScraper(ABC):
                 raise
 
     async def close_context(self) -> None:
-        async with self.lock:
+        async with self._context_lock:
             await self._cleanup()
 
     @abstractmethod
