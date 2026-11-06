@@ -1,4 +1,4 @@
-FROM node:25-bookworm-slim AS frontend-builder
+FROM node:25.9.0-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
 RUN npm install -g pnpm@latest
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
