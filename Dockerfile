@@ -1,7 +1,7 @@
 FROM node:26.13.0-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
-RUN npm install -g pnpm@latest
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+RUN npm install -g "$(node -p "require('./package.json').packageManager")"
 RUN pnpm install --frozen-lockfile
 COPY frontend/ .
 RUN pnpm run build
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
+    libatomic1 \
     libatspi2.0-0 \
     libcairo2 \
     libcups2 \
