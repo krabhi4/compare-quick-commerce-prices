@@ -13,12 +13,10 @@ export interface Alert {
 
 export function useAlerts() {
   const [alerts, setAlerts] = useState<Alert[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchAlerts = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
     try {
       const response = await fetch('/alerts', { signal })
       if (!response.ok) {
@@ -26,6 +24,7 @@ export function useAlerts() {
       }
       const data: Alert[] = await response.json()
       setAlerts(data)
+      setError(null)
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         return

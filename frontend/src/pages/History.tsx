@@ -24,8 +24,6 @@ export const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true)
-    setError(null)
     fetch('/history/products', { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Could not load tracked items (${res.status})`)

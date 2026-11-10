@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useAlerts } from '../hooks/useAlerts'
 import { formatAmount, formatDate } from '../utils/format'
 import { PLATFORM_INFO, PLATFORM_ORDER } from '../utils/normalize'
@@ -19,13 +19,10 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({
   const [targetPrice, setTargetPrice] = useState(
     initialPrice ? Math.floor(initialPrice * 0.9).toString() : ''
   )
-  const [pin, setPin] = useState(currentPin)
+  const [pinDraft, setPinDraft] = useState<string | null>(null)
+  const pin = pinDraft ?? currentPin
   const [platform, setPlatform] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    setPin(currentPin)
-  }, [currentPin])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,7 +88,7 @@ export const AlertsPage: React.FC<AlertsPageProps> = ({
               inputMode="numeric"
               maxLength={6}
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))}
               className="field tabular-nums"
             />
           </label>
