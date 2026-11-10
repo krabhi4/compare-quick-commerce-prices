@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 
 export interface PriceHistoryItem {
   scraped_at: string
@@ -16,51 +16,37 @@ export interface PriceHistoryResponse {
   history: PriceHistoryItem[]
 }
 
-export function useHistory(productName: string | null) {
-  const [history, setHistory] = useState<PriceHistoryItem[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
+interface HistoryResult {
+  name: string
+  history: PriceHistoryItem[]
+  error: string | null
+}
 
-  const fetchHistory = useCallback(async (name: string, signal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await fetch(`/history?name=${encodeURIComponent(name)}`, { signal })
-      if (!response.ok) {
-        throw new Error(`Could not load the price history (${response.status})`)
-      }
-      const data: PriceHistoryResponse = await response.json()
-      setHistory(data.history || [])
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
-      const message = err instanceof Error ? err.message : 'Could not load the price history'
-      setError(message)
-      setHistory([])
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [])
+export function useHistory(productName: string) {
+  const [result, setResult] = useState<HistoryResult | null>(null)
 
   useEffect(() => {
-    if (!productName) {
-      setHistory([])
-      return
-    }
     const controller = new AbortController()
-    fetchHistory(productName, controller.signal)
-    return () => {
-      controller.abort()
-    }
-  }, [productName, fetchHistory])
+    fetch(`/history?name=${encodeURIComponent(productName)}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Could not load the price history (${response.status})`)
+        }
+        const data: PriceHistoryResponse = await response.json()
+        setResult({ name: productName, history: data.history || [], error: null })
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
+        const message = err instanceof Error ? err.message : 'Could not load the price history'
+        setResult({ name: productName, history: [], error: message })
+      })
+    return () => controller.abort()
+  }, [productName])
 
+  const current = result?.name === productName ? result : null
   return {
-    history,
-    loading,
-    error,
-    refetch: () => productName && fetchHistory(productName),
+    history: current?.history ?? [],
+    loading: current === null,
+    error: current?.error ?? null,
   }
 }

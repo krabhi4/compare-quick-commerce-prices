@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 
 interface SearchBarProps {
   onSearch: (query: string, pin: string) => void
@@ -23,16 +23,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [pin, setPin] = useState(currentPin)
   const [editingPin, setEditingPin] = useState(false)
 
-  useEffect(() => {
-    if (!editingPin) {
-      setPin(currentPin)
-    }
-  }, [currentPin, editingPin])
-
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim() || loading) return
-    onSearch(query.trim(), pin.length === 6 ? pin : currentPin)
+    onSearch(query.trim(), editingPin && pin.length === 6 ? pin : currentPin)
   }
 
   const savePin = () => {
@@ -95,10 +89,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setPin(currentPin)
-                setEditingPin(false)
-              }}
+              onClick={() => setEditingPin(false)}
               className="link"
             >
               Cancel
@@ -116,7 +107,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <span className="flex items-center gap-3">
             <span className="label">Pincode</span>
             <span className="font-medium tabular-nums text-ink">{currentPin}</span>
-            <button type="button" onClick={() => setEditingPin(true)} className="link">
+            <button
+              type="button"
+              onClick={() => {
+                setPin(currentPin)
+                setEditingPin(true)
+              }}
+              className="link"
+            >
               Change
             </button>
           </span>
