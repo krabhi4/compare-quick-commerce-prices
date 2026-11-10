@@ -40,10 +40,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --no-compile --upgrade -r requirements.txt && \
     playwright install --only-shell chromium && \
     rm -rf /root/.cache/ms-playwright/ffmpeg* && \
-    find /root/.cache/ms-playwright -name "*WidevineCdm*" -prune -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.cache/ms-playwright -name "*WidevineCdm*" -prune -exec rm -rf {} + && \
     rm -rf /root/.cache/pip && \
-    find /usr/local -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /usr/local -name "*.pyc" -delete 2>/dev/null || true
+    find /usr/local -type d -name "__pycache__" -prune -exec rm -rf {} + && \
+    find /usr/local -name "*.pyc" -delete
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY scraper/ ./scraper/
 COPY api/ ./api/
