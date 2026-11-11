@@ -1,7 +1,7 @@
 FROM node:26.13.0-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
-RUN npm install -g "$(node -p "require('./package.json').packageManager")"
+RUN npm install -g --allow-scripts=pnpm "$(node -p "require('./package.json').packageManager")"
 RUN pnpm install --frozen-lockfile
 COPY frontend/ .
 RUN pnpm run build
@@ -37,13 +37,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir --no-compile --upgrade -r requirements.txt && \
+ENV PATH=/opt/venv/bin:$PATH
+RUN python -m venv --without-pip /opt/venv && \
+    pip --python /opt/venv/bin/python install --no-cache-dir --no-compile --upgrade -r requirements.txt && \
     playwright install --only-shell chromium && \
     rm -rf /root/.cache/ms-playwright/ffmpeg* && \
     find /root/.cache/ms-playwright -name "*WidevineCdm*" -prune -exec rm -rf {} + && \
     rm -rf /root/.cache/pip && \
-    find /usr/local -type d -name "__pycache__" -prune -exec rm -rf {} + && \
-    find /usr/local -name "*.pyc" -delete
+    find /usr/local /opt/venv -type d -name "__pycache__" -prune -exec rm -rf {} + && \
+    find /usr/local /opt/venv -name "*.pyc" -delete
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY scraper/ ./scraper/
 COPY api/ ./api/
