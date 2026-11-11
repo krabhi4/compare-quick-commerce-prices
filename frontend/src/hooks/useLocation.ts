@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 
 export interface LocationData {
   pin: string
@@ -14,26 +14,6 @@ export function useLocation() {
   })
   const [detecting, setDetecting] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-
-  const fetchLocation = useCallback(async () => {
-    try {
-      const response = await fetch('/location')
-      if (response.ok) {
-        const data: LocationData = await response.json()
-        setLocation(data)
-      } else {
-        const body = await response.json().catch(() => ({}))
-        setError(body.detail || `Could not load location (${response.status})`)
-      }
-    } catch {
-      const savedPin = localStorage.getItem('qc_pincode')
-      if (savedPin) {
-        setLocation((prev) => ({ ...prev, pin: savedPin }))
-      } else {
-        setError('Could not reach the server to load location')
-      }
-    }
-  }, [])
 
   const updateLocation = async (pin?: string, lat?: number, lon?: number): Promise<string | null> => {
     setError(null)
@@ -83,8 +63,27 @@ export function useLocation() {
   }
 
   useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const response = await fetch('/location')
+        if (response.ok) {
+          const data: LocationData = await response.json()
+          setLocation(data)
+        } else {
+          const body = await response.json().catch(() => ({}))
+          setError(body.detail || `Could not load location (${response.status})`)
+        }
+      } catch {
+        const savedPin = localStorage.getItem('qc_pincode')
+        if (savedPin) {
+          setLocation((prev) => ({ ...prev, pin: savedPin }))
+        } else {
+          setError('Could not reach the server to load location')
+        }
+      }
+    }
     fetchLocation()
-  }, [fetchLocation])
+  }, [])
 
   return {
     location,

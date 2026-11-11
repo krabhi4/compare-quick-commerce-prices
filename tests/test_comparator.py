@@ -19,6 +19,7 @@ from scraper.instamart import parse_search, InstamartScraper
 from scraper.flipkart import parse_page
 from scraper.bigbasket import parse_products
 from db.repository import (
+    engine,
     init_database,
     create_alert,
     get_alerts,
@@ -297,6 +298,9 @@ class TestDatabaseRepository(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await init_database()
 
+    async def asyncTearDown(self):
+        await engine.dispose()
+
     async def test_alert_lifecycle(self):
         alert = await create_alert(
             product_query="test milk",
@@ -343,6 +347,9 @@ class TestDatabaseRepository(unittest.IsolatedAsyncioTestCase):
 class TestAPIEndpoints(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await init_database()
+
+    async def asyncTearDown(self):
+        await engine.dispose()
 
     async def test_endpoints(self):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:

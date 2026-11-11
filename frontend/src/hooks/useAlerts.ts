@@ -16,27 +16,31 @@ export function useAlerts() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchAlerts = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await fetch('/alerts', { signal })
-      if (!response.ok) {
-        throw new Error(`Could not load your alerts (${response.status})`)
-      }
-      const data: Alert[] = await response.json()
-      setAlerts(data)
-      setError(null)
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
-      const message = err instanceof Error ? err.message : 'Could not load your alerts'
-      setError(message)
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [])
+  const fetchAlerts = useCallback(
+    (signal?: AbortSignal) =>
+      fetch('/alerts', { signal })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Could not load your alerts (${response.status})`)
+          }
+          const data: Alert[] = await response.json()
+          setAlerts(data)
+          setError(null)
+        })
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.name === 'AbortError') {
+            return
+          }
+          const message = err instanceof Error ? err.message : 'Could not load your alerts'
+          setError(message)
+        })
+        .finally(() => {
+          if (!signal?.aborted) {
+            setLoading(false)
+          }
+        }),
+    []
+  )
 
   const addAlert = async (
     product_query: string,
