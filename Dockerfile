@@ -1,4 +1,4 @@
-FROM node:26.13.0-bookworm-slim AS frontend-builder
+FROM node:26.13.1-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 RUN npm install -g --allow-scripts=pnpm "$(node -p "require('./package.json').packageManager")"
