@@ -1,6 +1,6 @@
 FROM node:26.13.1-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/pnpm-workspace.yaml ./
 RUN npm install -g --allow-scripts=pnpm "$(node -p "require('./package.json').packageManager")"
 RUN pnpm install --frozen-lockfile
 COPY frontend/ .

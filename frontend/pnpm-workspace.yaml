@@ -1,0 +1,2 @@
+overrides:
+  workbox-build>glob: ^14.0.6
